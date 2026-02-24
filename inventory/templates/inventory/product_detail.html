@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+
+{% block title %}Product Detail - {{ product.name }}{% endblock %}
+
+{% block content %}
+<h1>Product Details</h1>
+
+<div class="card">
+    <table class="detail-table">
+        <tr><th>SKU</th><td>{{ product.sku|default:"—" }}</td></tr>
+        <tr><th>Part #</th><td>{{ product.part_number|default:"—" }}</td></tr>
+        <tr><th>Name</th><td>{{ product.name }}</td></tr>
+        <tr><th>Brand</th><td>{{ product.brand|default:"—" }}</td></tr>
+        <tr><th>Category</th><td>{{ product.category.name|default:"—" }}</td></tr>
+        <tr><th>Quantity</th><td>{{ product.quantity }}</td></tr>
+        <tr><th>Reorder Level</th><td>{{ product.reorder_level }}</td></tr>
+        <tr><th>Cost Price</th><td>{{ product.cost_price|floatformat:2 }}</td></tr>
+        <tr><th>Selling Price</th><td>{{ product.selling_price|floatformat:2 }}</td></tr>
+        <tr><th>Wholesale Price</th><td>{{ product.wholesale_price|floatformat:2 }}</td></tr>
+        <tr><th>Location</th><td>{{ product.location|default:"—" }}</td></tr>
+        <tr><th>Purpose</th><td>{{ product.purpose|default:"—" }}</td></tr>
+        <tr><th>Vehicle/Car Types</th><td>
+            {% if product.compatibilities.exists %}
+                {% for cm in product.compatibilities.all %}
+                    {{ cm }}{% if not forloop.last %}, {% endif %}
+                {% endfor %}
+            {% else %}
+                {{ product.vehicle_application|default:"—" }}
+            {% endif %}
+        </td></tr>
+        <tr><th>Status</th><td>{% if product.is_low_stock %}<span class="badge badge-low">Low</span>{% else %}<span class="badge badge-ok">OK</span>{% endif %}</td></tr>
+    </table>
+    <p style="margin-top:1rem;"><a href="{% url 'product_list' %}" class="btn btn-secondary">Back to inventory</a></p>
+</div>
+
+<style>
+.detail-table { width:100%; border-collapse: collapse; }
+.detail-table th { text-align:left; padding:0.5rem; background:#f0f0f0; width:20%; }
+.detail-table td { padding:0.5rem; }
+</style>
+{% endblock %}

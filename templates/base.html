@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}ERP - My Shop{% endblock %}</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #0f0f12;
+            --bg-card: #18181c;
+            --bg-hover: #222228;
+            --accent: #6366f1;
+            --accent-hover: #818cf8;
+            --text: #f4f4f5;
+            --text-muted: #a1a1aa;
+            --border: #27272a;
+            --success: #22c55e;
+            --error: #ef4444;
+        }
+        * { box-sizing: border-box; }
+        body {
+            font-family: 'DM Sans', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            margin: 0;
+            min-height: 100vh;
+            line-height: 1.6;
+        }
+        .layout {
+            display: flex;
+            min-height: 100vh;
+        }
+        nav {
+            width: 220px;
+            background: var(--bg-card);
+            border-right: 1px solid var(--border);
+            padding: 1.5rem 0;
+        }
+        nav a {
+            display: block;
+            padding: 0.75rem 1.5rem;
+            color: var(--text-muted);
+            text-decoration: none;
+            transition: all 0.2s;
+        }
+        nav a:hover, nav a.active {
+            color: var(--accent);
+            background: var(--bg-hover);
+        }
+        main {
+            flex: 1;
+            padding: 2rem;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        .card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+        }
+        h1, h2 { margin-top: 0; }
+        h1 { font-size: 1.75rem; }
+        h2 { font-size: 1.35rem; color: var(--text); }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.9rem;
+        }
+        th, td {
+            padding: 0.75rem 1rem;
+            text-align: left;
+            border-bottom: 1px solid var(--border);
+        }
+        th {
+            background: var(--bg-hover);
+            color: var(--text-muted);
+            font-weight: 600;
+        }
+        tr:hover td { background: var(--bg-hover); }
+        .btn {
+            display: inline-block;
+            padding: 0.6rem 1.2rem;
+            background: var(--accent);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            font-weight: 500;
+            cursor: pointer;
+            text-decoration: none;
+            transition: background 0.2s;
+        }
+        .btn:hover { background: var(--accent-hover); }
+        .btn-secondary {
+            background: var(--bg-hover);
+            color: var(--text);
+        }
+        .btn-secondary:hover { background: var(--border); }
+        input[type="text"], input[type="number"], input[type="password"], input[type="date"] {
+            padding: 0.6rem 1rem;
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            color: var(--text);
+            font-size: 0.95rem;
+        }
+        input:focus {
+            outline: none;
+            border-color: var(--accent);
+        }
+        .errors { color: var(--error); margin-bottom: 1rem; }
+        .errors ul { margin: 0; padding-left: 1.25rem; }
+        .nav-user {
+            padding: 1rem 1.5rem;
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            border-bottom: 1px solid var(--border);
+        }
+    </style>
+    {% block extra_css %}{% endblock %}
+</head>
+<body>
+    <div class="layout">
+        {% if user.is_authenticated %}
+        <nav>
+            <div class="nav-user">{{ user.get_username }}</div>
+            <a href="{% url 'dashboard' %}" class="{% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}">Dashboard</a>
+            <a href="{% url 'pos' %}" class="{% if request.resolver_match.url_name == 'pos' %}active{% endif %}">Point of Sale</a>
+            <a href="{% url 'product_list' %}" class="{% if request.resolver_match.url_name == 'product_list' or request.resolver_match.url_name == 'import_inventory' %}active{% endif %}">Inventory</a>
+            <a href="{% url 'purchase_list' %}" class="{% if request.resolver_match.url_name == 'purchase_list' or request.resolver_match.url_name == 'purchase_add' %}active{% endif %}">Purchases</a>
+            <a href="{% url 'sales_report' %}" class="{% if request.resolver_match.url_name == 'sales_report' %}active{% endif %}">Sales Report</a>
+            <a href="{% url 'business_report' %}" class="{% if request.resolver_match.url_name == 'business_report' %}active{% endif %}">Business Report</a>
+            {% if user.is_staff %}
+            <a href="/admin/">Admin</a>
+            {% endif %}
+            <a href="{% url 'logout' %}" style="margin-top: auto;">Logout</a>
+        </nav>
+        {% endif %}
+        <main>
+            {% block content %}{% endblock %}
+        </main>
+    </div>
+</body>
+</html>

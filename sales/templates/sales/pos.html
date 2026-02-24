@@ -1,0 +1,124 @@
+{% extends "base.html" %}
+
+{% block title %}Point of Sale - ERP My Shop{% endblock %}
+
+{% block content %}
+<h1>Point of Sale</h1>
+<form method="get" style="margin-bottom:1rem;">
+    <input type="text" name="q" placeholder="Search part, OEM, brand, car model..." value="{{ request.GET.q }}" style="width:300px; padding:0.4rem;">
+    <label style="margin-left:1rem;">
+        Price type:
+        <select name="price_type">
+            <option value="retail" {% if request.GET.price_type != 'wholesale' %}selected{% endif %}>Retail</option>
+            <option value="wholesale" {% if request.GET.price_type == 'wholesale' %}selected{% endif %}>Wholesale</option>
+        </select>
+    </label>
+    <button type="submit" class="btn" style="margin-left:0.5rem;">Search</button>
+</form>
+
+{% if errors %}
+<div class="card errors">
+    <ul>
+        {% for error in errors %}
+        <li>{{ error }}</li>
+        {% endfor %}
+    </ul>
+</div>
+{% endif %}
+
+<div class="card">
+    <form method="post" id="sale-form">
+        {% csrf_token %}
+        <table>
+            <thead>
+                <tr>
+                            <th>Product</th>
+                    <th>Cost</th>
+                    <th>Retail</th>
+                    <th>Wholesale</th>
+                    <th>Stock</th>
+                    <th>Qty</th>
+                    <th>Total</th>
+                    <th>Profit</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for p in products %}
+                <tr>
+                    <td><a href="{% url 'product_detail' p.id %}">{{ p.name }}</a></td>
+                    <td>{{ p.cost_price|floatformat:2 }}</td>
+                    <td>{{ p.selling_price|floatformat:2 }}</td>
+                    <td>{{ p.wholesale_price|floatformat:2 }}</td>
+                    <td>{{ p.quantity }}</td>
+                    <td>
+                        <input type="number" name="qty_{{ p.id }}"
+                               data-retail="{{ p.selling_price }}"
+                               data-wholesale="{{ p.wholesale_price }}"
+                               data-cost="{{ p.cost_price }}"
+                               min="0" max="{{ p.quantity }}" value="0"
+                               style="width: 80px;" class="qty-input">
+                    </td>
+                    <td class="line-total">0.00</td>
+                    <td class="line-profit">0.00</td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="7">No products available. Add products via Admin.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        <p style="margin-top: 1rem;">
+            <label>Price type:
+                <select id="price-type-select" name="price_type" form="sale-form">
+                    <option value="retail" {% if request.GET.price_type != 'wholesale' %}selected{% endif %}>Retail</option>
+                    <option value="wholesale" {% if request.GET.price_type == 'wholesale' %}selected{% endif %}>Wholesale</option>
+                </select>
+            </label>
+            <strong style="margin-left:1rem;">Grand Total: <span id="grand-total">0.00</span></strong>
+            &nbsp;&nbsp;<strong>Estimated Profit: <span id="grand-profit">0.00</span></strong>
+        </p>
+        <p style="margin-top: 0.5rem;">
+            <button type="submit" class="btn">Complete Sale</button>
+        </p>
+    </form>
+    <script>
+        // calculate totals as quantity inputs change
+        document.addEventListener('DOMContentLoaded', function() {
+            const qtyInputs = document.querySelectorAll('.qty-input');
+            const grandTotalEl = document.getElementById('grand-total');
+
+            function recalc() {
+                let grand = 0;
+                let grandProfit = 0;
+                const priceType = document.getElementById('price-type-select').value;
+                qtyInputs.forEach(function(inp) {
+                    const qty = parseFloat(inp.value) || 0;
+                    const retail = parseFloat(inp.dataset.retail) || 0;
+                    const wholesale = parseFloat(inp.dataset.wholesale) || 0;
+                    const cost = parseFloat(inp.dataset.cost) || 0;
+                    const price = priceType === 'wholesale' ? wholesale : retail;
+                    const line = qty * price;
+                    const profit = qty * (price - cost);
+                    const row = inp.closest('tr');
+                    const totalCell = row.querySelector('.line-total');
+                    const profitCell = row.querySelector('.line-profit');
+                    if (totalCell) {
+                        totalCell.textContent = line.toFixed(2);
+                    }
+                    if (profitCell) {
+                        profitCell.textContent = profit.toFixed(2);
+                    }
+                    grand += line;
+                    grandProfit += profit;
+                });
+                grandTotalEl.textContent = grand.toFixed(2);
+                document.getElementById('grand-profit').textContent = grandProfit.toFixed(2);
+            }
+            qtyInputs.forEach(function(inp) {
+                inp.addEventListener('input', recalc);
+            });
+        });
+    </script>
+</div>
+{% endblock %}

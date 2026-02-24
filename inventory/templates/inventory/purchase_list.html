@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+
+{% block title %}Purchases (Bought Items) - ERP My Shop{% endblock %}
+
+{% block content %}
+<h1>Purchases (Bought Items)</h1>
+
+<div class="card">
+    <form method="get" style="display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center;">
+        <label>From: <input type="date" name="date_from" value="{{ date_from }}"></label>
+        <label>To: <input type="date" name="date_to" value="{{ date_to }}"></label>
+        <button type="submit" class="btn">Filter</button>
+    </form>
+    <p style="margin-top: 1rem;">
+        <a href="{% url 'purchase_add' %}" class="btn">Add Purchase</a>
+    </p>
+</div>
+
+<div class="card">
+    <table>
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Date</th>
+                <th>Supplier</th>
+                <th>Invoice #</th>
+                <th>Items</th>
+                <th>Total</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for purchase in purchases %}
+            <tr>
+                <td>{{ purchase.id }}</td>
+                <td>{{ purchase.date|date:"M d, Y H:i" }}</td>
+                <td>{{ purchase.supplier.name|default:"—" }}</td>
+                <td>{{ purchase.invoice_number|default:"—" }}</td>
+                <td>
+                    {% for item in purchase.items.all %}
+                    {{ item.product.name }} x{{ item.quantity }} @ {{ item.unit_cost|floatformat:2 }}{% if not forloop.last %}; {% endif %}
+                    {% empty %}—{% endfor %}
+                </td>
+                <td>{{ purchase.total_amount|floatformat:2 }}</td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="5">No purchases yet. <a href="{% url 'purchase_add' %}">Add a purchase</a>.</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% if purchases %}
+    <p style="margin-top: 1rem;"><strong>Total (filtered): {{ total_bought|floatformat:2 }}</strong></p>
+    {% endif %}
+</div>
+{% endblock %}

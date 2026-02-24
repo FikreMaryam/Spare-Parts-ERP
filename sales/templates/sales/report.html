@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+
+{% block title %}Sales Report - ERP My Shop{% endblock %}
+
+{% block content %}
+<h1>Sales Report</h1>
+
+<div class="card">
+    <form method="get" style="display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center; margin-bottom: 1rem;">
+        <label>From: <input type="date" name="date_from" value="{{ date_from }}"></label>
+        <label>To: <input type="date" name="date_to" value="{{ date_to }}"></label>
+        <button type="submit" class="btn">Filter by date</button>
+    </form>
+    <table>
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Date</th>
+                <th>Payment</th>
+                <th>Total</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for sale in sales %}
+            <tr>
+                <td>{{ sale.id }}</td>
+                <td>{{ sale.date|date:"M d, Y H:i" }}</td>
+                <td>{{ sale.payment_method }}</td>
+                <td>{{ sale.total_amount|floatformat:2 }}</td>
+                <td>
+                    <a href="{% url 'invoice' sale.id %}" class="btn btn-secondary" style="padding: 0.4rem 0.8rem; font-size: 0.85rem;">View</a>
+                </td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="5">No sales yet.</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    <p style="margin-top: 1rem; font-size: 1.1rem;">
+        <strong>Grand Total Sales: {{ total_sales|floatformat:2 }}</strong>
+        <span style="margin-left: 1rem;">Profit: {{ total_profit|floatformat:2 }}</span>
+    </p>
+</div>
+{% endblock %}

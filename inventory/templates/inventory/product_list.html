@@ -1,0 +1,137 @@
+{% extends "base.html" %}
+{% load inventory_extras %}
+
+{% block title %}Inventory - ERP My Shop{% endblock %}
+
+{% block content %}
+<h1>Inventory</h1>
+
+<div class="card">
+    <form method="get" class="inventory-toolbar" id="filter-form">
+        <div class="toolbar-row">
+            <input type="text" name="q" value="{{ search }}" placeholder="Search name, part #, brand, location..." class="search-input">
+            <select name="category">
+                <option value="">All categories</option>
+                {% for c in categories %}
+                <option value="{{ c.id }}" {% if filter_category == c.id|stringformat:"s" %}selected{% endif %}>{{ c.name }}</option>
+                {% endfor %}
+            </select>
+            <select name="brand">
+                <option value="">All brands</option>
+                {% for b in brands %}
+                <option value="{{ b }}" {% if filter_brand == b %}selected{% endif %}>{{ b }}</option>
+                {% endfor %}
+            </select>
+            <select name="stock">
+                <option value="">All stock</option>
+                <option value="low" {% if filter_stock == 'low' %}selected{% endif %}>Low stock only</option>
+                <option value="ok" {% if filter_stock == 'ok' %}selected{% endif %}>In stock (OK)</option>
+            </select>
+            <select name="per_page">
+                <option value="25" {% if per_page == 25 %}selected{% endif %}>25 per page</option>
+                <option value="50" {% if per_page == 50 %}selected{% endif %}>50 per page</option>
+                <option value="100" {% if per_page == 100 %}selected{% endif %}>100 per page</option>
+            </select>
+            <button type="submit" class="btn">Apply</button>
+            {% if search or filter_category or filter_brand or filter_stock or per_page != 25 %}
+            <a href="{% url 'product_list' %}" class="btn btn-secondary">Clear</a>
+            {% endif %}
+        </div>
+    </form>
+    <p style="margin-top: 0.75rem;">
+        <a href="{% url 'export_inventory' %}{% if request.GET %}?{{ request.GET.urlencode }}{% endif %}" class="btn">Export to Excel</a>
+        <a href="{% url 'import_inventory' %}" class="btn btn-secondary" style="margin-left: 0.5rem;">Import from Excel</a>
+    </p>
+</div>
+
+<div class="card">
+    <p class="result-count">
+        {% if page.paginator.count == 0 %}
+        No products found.
+        {% else %}
+        Showing {{ page.start_index }}-{{ page.end_index }} of {{ page.paginator.count }} product{{ page.paginator.count|pluralize }}
+        {% endif %}
+    </p>
+
+    <table class="sortable-table">
+        <thead>
+            <tr>
+                <th>{% include "inventory/_sort_header.html" with field="part" label="Part #" %}</th>
+                <th>{% include "inventory/_sort_header.html" with field="name" label="Name" %}</th>
+                <th>{% include "inventory/_sort_header.html" with field="brand" label="Brand" %}</th>
+                <th>{% include "inventory/_sort_header.html" with field="category" label="Category" %}</th>
+                <th>{% include "inventory/_sort_header.html" with field="qty" label="Qty" %}</th>
+                <th>{% include "inventory/_sort_header.html" with field="cost" label="Cost" %}</th>
+                <th>{% include "inventory/_sort_header.html" with field="price" label="Price" %}</th>
+                <th>Location</th>
+                <th>Car Types</th>
+                <th>Status</th>
+                <th>Action</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for product in products %}
+            <tr>
+                <td>{{ product.part_number|default:"—" }}</td>
+                <td><a href="{% url 'product_detail' product.id %}">{{ product.name }}</a></td>
+                <td>{{ product.brand|default:"—" }}</td>
+                <td>{{ product.category.name|default:"—" }}</td>
+                <td>{{ product.quantity }}</td>
+                <td>{{ product.cost_price|floatformat:2 }}</td>
+                <td>{{ product.selling_price|floatformat:2 }}</td>
+                <td>{{ product.location|default:"—"|truncatewords:5 }}</td>
+                <td class="car-types">
+                    {% if product.compatibilities.exists %}
+                        {% for cm in product.compatibilities.all %}
+                            {{ cm }}{% if not forloop.last %}, {% endif %}
+                        {% endfor %}
+                    {% else %}
+                        {{ product.vehicle_application|default:"—"|truncatewords:12 }}
+                    {% endif %}
+                </td>
+                <td>
+                    {% if product.is_low_stock %}
+                    <span class="badge badge-low">Low</span>
+                    {% else %}
+                    <span class="badge badge-ok">OK</span>
+                    {% endif %}
+                </td>
+                <td><a href="{% url 'product_detail' product.id %}" class="btn btn-secondary" style="padding:0.3rem 0.6rem; font-size:0.8rem;">View</a></td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="10">No products. <a href="{% url 'import_inventory' %}">Import from Excel</a> or add via Admin.</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    {% if page.has_other_pages %}
+    <div class="pagination">
+        {% if page.has_previous %}
+        <a href="{% page_url page.previous_page_number %}" class="btn btn-secondary">← Previous</a>
+        {% endif %}
+        <span class="page-info">Page {{ page.number }} of {{ page.paginator.num_pages }}</span>
+        {% if page.has_next %}
+        <a href="{% page_url page.next_page_number %}" class="btn btn-secondary">Next →</a>
+        {% endif %}
+    </div>
+    {% endif %}
+</div>
+
+<style>
+    .inventory-toolbar .toolbar-row { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; }
+    .search-input { flex: 1; min-width: 200px; max-width: 320px; }
+    .inventory-toolbar select { min-width: 140px; padding: 0.6rem 1rem; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; color: var(--text); }
+    .result-count { font-size: 0.9rem; color: var(--text-muted); margin-bottom: 1rem; }
+    .sortable-table th a { color: inherit; text-decoration: none; display: flex; align-items: center; gap: 0.25rem; }
+    .sortable-table th a:hover { color: var(--accent); }
+    .sort-link { opacity: 0.5; font-size: 0.75rem; }
+    .badge { padding: 0.2rem 0.5rem; border-radius: 4px; font-size: 0.8rem; font-weight: 500; }
+    .badge-low { background: rgba(239,68,68,0.2); color: var(--error); }
+    .badge-ok { background: rgba(34,197,94,0.2); color: var(--success); }
+    .pagination { display: flex; align-items: center; gap: 1rem; margin-top: 1rem; }
+    .page-info { font-size: 0.9rem; color: var(--text-muted); }
+    .car-types { max-width: 200px; font-size: 0.85rem; }
+</style>
+{% endblock %}

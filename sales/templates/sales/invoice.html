@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+
+{% block title %}Invoice #{{ sale.id }} - ERP My Shop{% endblock %}
+
+{% block content %}
+<h1>Invoice #{{ sale.id }}</h1>
+
+<div class="card">
+    <p><strong>Date:</strong> {{ sale.date|date:"F d, Y H:i" }}</p>
+    <p><strong>Payment:</strong> {{ sale.payment_method }}</p>
+</div>
+
+<div class="card">
+    <table>
+        <thead>
+            <tr>
+                <th>Product</th>
+                <th>Qty</th>
+                <th>Unit Price</th>
+                <th>Cost</th>
+                <th>Total</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in sale.items.all %}
+            <tr>
+                <td><a href="{% url 'product_detail' item.product.id %}">{{ item.product.name }}</a></td>
+                <td>{{ item.quantity }}</td>
+                <td>{{ item.price|floatformat:2 }}</td>
+                <td>{{ item.cost_price|floatformat:2 }}</td>
+                <td>{{ item.line_total|floatformat:2 }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    <p style="margin-top: 1rem; font-size: 1.2rem;">
+        <strong>Total: {{ sale.total_amount|floatformat:2 }}</strong>
+        <span style="margin-left: 1rem;">Profit: {{ sale.profit|floatformat:2 }}</span>
+    </p>
+</div>
+
+<p>
+    <a href="{% url 'invoice_pdf' sale.id %}" class="btn" target="_blank">Download PDF Invoice</a>
+    <a href="{% url 'pos' %}" class="btn btn-secondary" style="margin-left: 0.5rem;">New Sale</a>
+</p>
+{% endblock %}

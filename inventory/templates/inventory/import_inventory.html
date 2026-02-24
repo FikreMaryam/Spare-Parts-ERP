@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+
+{% block title %}Import Inventory - ERP My Shop{% endblock %}
+
+{% block content %}
+<h1>Import Inventory from Excel</h1>
+
+<div class="card">
+    {% if error %}
+    <div class="errors">
+        <ul><li>{{ error }}</li></ul>
+    </div>
+    {% endif %}
+
+    {% if success %}
+    <p style="color: var(--success);">{{ success }}</p>
+    {% endif %}
+
+    {% if errors %}
+    <div class="errors">
+        <ul>
+            {% for e in errors %}
+            <li>{{ e }}</li>
+            {% endfor %}
+        </ul>
+    </div>
+    {% endif %}
+
+    <h2>Supported Excel Formats</h2>
+
+    <h3>Spare Parts Format (e.g. INVENTORY.xlsx)</h3>
+    <p>Header row: <strong>PART NAME</strong>, PART NUMBER, …, QTY, INSIDE PART NUMBER, MARK, TYPE, PURPOSE, FOR WHAT CAR IT IS USED</p>
+    <table>
+        <thead>
+            <tr>
+                <th>A: Part Name</th>
+                <th>B: Part #</th>
+                <th>E: Qty</th>
+                <th>F: Inside Part #</th>
+                <th>G: Mark (Brand)</th>
+                <th>H: Type (Category)</th>
+            </tr>
+        </thead>
+    </table>
+    <p style="font-size: 0.9rem; color: var(--text-muted);">Section headers (B0, C0, etc.) are skipped. Selling price is set to 0—update in Admin after import.</p>
+
+    <h3>Standard Format</h3>
+    <p>Columns: Part Number, Name, Brand, Category, Quantity, Selling Price, Location</p>
+
+    <p style="margin-top: 1rem;"><a href="{% url 'export_inventory' %}">Export current inventory</a> to get the standard template.</p>
+
+    <form method="post" enctype="multipart/form-data" style="margin-top: 1.5rem;">
+        {% csrf_token %}
+        <div>
+            <label for="file">Select Excel file (.xlsx):</label><br>
+            <input type="file" name="file" id="file" accept=".xlsx" required style="margin-top: 0.5rem;">
+        </div>
+        <p style="margin-top: 1rem;">
+            <button type="submit" class="btn">Import</button>
+            <a href="{% url 'product_list' %}" class="btn btn-secondary" style="margin-left: 0.5rem;">Back to Inventory</a>
+        </p>
+    </form>
+</div>
+{% endblock %}

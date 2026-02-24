@@ -1,0 +1,7 @@
+{% load inventory_extras %}
+<a href="{% sort_url field %}">
+    {{ label }}
+    {% if sort == field %}
+    <span class="sort-link">{% if order == 'asc' %}▲{% else %}▼{% endif %}</span>
+    {% endif %}
+</a>

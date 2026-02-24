@@ -1,0 +1,11 @@
+<h2>Edit Product</h2>
+
+<form method="post">
+    {% csrf_token %}
+    Name: <input type="text" name="name" value="{{ product.name }}"><br>
+    Cost Price: <input type="number" step="0.01" name="cost_price" value="{{ product.cost_price }}"><br>
+    Selling Price: <input type="number" step="0.01" name="selling_price" value="{{ product.selling_price }}"><br>
+    Stock: <input type="number" name="stock" value="{{ product.stock }}"><br>
+
+    <button type="submit">Update</button>
+</form>
