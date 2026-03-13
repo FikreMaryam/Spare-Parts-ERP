@@ -181,6 +181,7 @@ def cart_view(request):
 
             sale.total_amount = total
             sale.save()
+            sale.award_loyalty_points()
         # clear cart and prices
         request.session["cart"] = {}
         request.session["cart_prices"] = {}
@@ -249,10 +250,11 @@ def customer_list(request):
 
 @login_required
 def customer_detail(request, pk):
-    from .models import Customer
+    from .models import Customer, LoyaltyTransaction
     cust = get_object_or_404(Customer, id=pk)
     sales = Sale.objects.filter(customer=cust).prefetch_related('items')
-    return render(request, "sales/customer_detail.html", {"customer": cust, "sales": sales})
+    transactions = LoyaltyTransaction.objects.filter(customer=cust).order_by('-date')
+    return render(request, "sales/customer_detail.html", {"customer": cust, "sales": sales, "transactions": transactions})
 
 
 @login_required

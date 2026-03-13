@@ -8,6 +8,7 @@ class Customer(models.Model):
     email = models.EmailField(blank=True)
     address = models.TextField(blank=True)
     credit_limit = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    loyalty_points = models.PositiveIntegerField(default=0, help_text="Accumulated loyalty points")
 
     def __str__(self):
         return self.name
@@ -44,6 +45,20 @@ class Sale(models.Model):
     def profit(self):
         return sum(item.profit() for item in self.items.all())
 
+    def award_loyalty_points(self):
+        if self.customer:
+            points = int(self.calculate_total() // 10)  # 1 point per $10 spent
+            if points > 0:
+                self.customer.loyalty_points += points
+                self.customer.save()
+                LoyaltyTransaction.objects.create(
+                    customer=self.customer,
+                    sale=self,
+                    points=points,
+                    transaction_type="EARN",
+                    description=f"Earned {points} points for purchase of ${self.calculate_total()}"
+                )
+
     def __str__(self):
         if self.customer:
             return f"Sale #{self.id} ({self.customer.name})"
@@ -70,3 +85,19 @@ class SaleItem(models.Model):
 
     def __str__(self):
         return f"{self.product.name} ({self.quantity})"
+
+
+class LoyaltyTransaction(models.Model):
+    TRANSACTION_TYPES = [
+        ("EARN", "Earned"),
+        ("SPEND", "Spent"),
+    ]
+    customer = models.ForeignKey(Customer, on_delete=models.CASCADE)
+    sale = models.ForeignKey(Sale, null=True, blank=True, on_delete=models.SET_NULL, help_text="Sale that triggered the transaction")
+    points = models.IntegerField(help_text="Points earned (positive) or spent (negative)")
+    transaction_type = models.CharField(max_length=10, choices=TRANSACTION_TYPES)
+    date = models.DateTimeField(auto_now_add=True)
+    description = models.CharField(max_length=200, blank=True)
+
+    def __str__(self):
+        return f"{self.customer.name}: {self.get_transaction_type_display()} {abs(self.points)} points"

@@ -8,6 +8,7 @@
     {% if customer.phone %}Phone: {{ customer.phone }}<br>{% endif %}
     {% if customer.email %}Email: {{ customer.email }}<br>{% endif %}
     {% if customer.address %}Address: {{ customer.address }}<br>{% endif %}
+    Loyalty Points: {{ customer.loyalty_points }}
 </p>
 <h2>Purchase history</h2>
 {% if sales %}
@@ -26,5 +27,23 @@
 </table>
 {% else %}
 <p>No sales yet.</p>
+{% endif %}
+<h2>Loyalty Transactions</h2>
+{% if transactions %}
+<table class="card">
+    <thead><tr><th>Date</th><th>Type</th><th>Points</th><th>Description</th></tr></thead>
+    <tbody>
+    {% for t in transactions %}
+    <tr>
+        <td>{{ t.date|date:"M d, Y H:i" }}</td>
+        <td>{{ t.get_transaction_type_display }}</td>
+        <td>{{ t.points }}</td>
+        <td>{{ t.description }}</td>
+    </tr>
+    {% endfor %}
+    </tbody>
+</table>
+{% else %}
+<p>No loyalty transactions yet.</p>
 {% endif %}
 {% endblock %}
