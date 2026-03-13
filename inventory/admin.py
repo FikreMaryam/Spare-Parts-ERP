@@ -1,5 +1,17 @@
 from django.contrib import admin
-from .models import Category, Product, Supplier, Purchase, PurchaseItem, CarMake, CarModel
+from .models import (
+    Category,
+    Product,
+    Supplier,
+    Purchase,
+    PurchaseItem,
+    CarMake,
+    CarModel,
+    Warehouse,
+    StockMovement,
+    Account,
+    JournalEntry,
+)
 from django.utils.safestring import mark_safe
 
 
@@ -24,10 +36,42 @@ class CarMakeAdmin(admin.ModelAdmin):
     search_fields = ("name",)
 
 
+@admin.register(Warehouse)
+class WarehouseAdmin(admin.ModelAdmin):
+    list_display = ("name", "location")
+    search_fields = ("name", "location")
+
+
+@admin.register(StockMovement)
+class StockMovementAdmin(admin.ModelAdmin):
+    list_display = ("timestamp", "product", "quantity", "movement_type", "warehouse")
+    list_filter = ("movement_type", "warehouse")
+    search_fields = ("product__name", "reference")
+
+
+@admin.register(Account)
+class AccountAdmin(admin.ModelAdmin):
+    list_display = ("code", "name", "parent")
+    search_fields = ("code", "name")
+
+
+@admin.register(JournalEntry)
+class JournalEntryAdmin(admin.ModelAdmin):
+    list_display = ("date", "description", "amount", "debit_account", "credit_account")
+    search_fields = ("description",)
+
+
 @admin.register(CarModel)
 class CarModelAdmin(admin.ModelAdmin):
-    list_display = ("make", "name", "year_from", "year_to", "engine_type")
-    search_fields = ("name", "make__name")
+    list_display = (
+        "make",
+        "name",
+        "year_from",
+        "year_to",
+        "engine_type",
+        "chassis_prefixes",
+    )
+    search_fields = ("name", "make__name", "chassis_prefixes")
     list_filter = ("make",)
 
 

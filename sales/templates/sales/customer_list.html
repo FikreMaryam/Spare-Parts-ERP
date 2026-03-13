@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+
+{% block title %}Customers - ERP My Shop{% endblock %}
+
+{% block content %}
+<h1>Customers</h1>
+<ul>
+    {% for c in customers %}
+    <li><a href="{% url 'customer_detail' c.id %}">{{ c.name }}</a>{% if c.phone %} &ndash; {{ c.phone }}{% endif %}</li>
+    {% empty %}
+    <li>No customers found.</li>
+    {% endfor %}
+</ul>
+{% endblock %}

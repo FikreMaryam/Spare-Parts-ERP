@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+
+{% block title %}Accounts - ERP My Shop{% endblock %}
+
+{% block content %}
+<h1>GL Accounts</h1>
+<table class="card">
+    <thead>
+        <tr><th>Code</th><th>Name</th><th>Parent</th></tr>
+    </thead>
+    <tbody>
+        {% for a in accounts %}
+        <tr>
+            <td>{{ a.code }}</td>
+            <td>{{ a.name }}</td>
+            {% if a.parent %}
+            <td>{{ a.parent.name }}</td>
+            {% else %}
+            <td>&mdash;</td>
+            {% endif %}
+        </tr>
+        {% empty %}
+        <tr><td colspan="3">No accounts defined.</td></tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endblock %}

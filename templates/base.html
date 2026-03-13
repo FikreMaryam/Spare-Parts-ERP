@@ -8,6 +8,49 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700&display=swap" rel="stylesheet">
     <style>
+        /* top‑right fixed switch container */
+        .theme-switch-container {
+            position: fixed;
+            top: 1rem;
+            right: 1rem;
+            z-index: 1000;
+        }
+        /* slider switch styling */
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 40px;
+            height: 20px;
+        }
+        .switch input { display: none; }
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: var(--border);
+            transition: .4s;
+            border-radius: 20px;
+        }
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 16px;
+            width: 16px;
+            left: 2px;
+            bottom: 2px;
+            background-color: var(--bg-card);
+            transition: .4s;
+            border-radius: 50%;
+        }
+        input:checked + .slider {
+            background-color: var(--accent);
+        }
+        input:checked + .slider:before {
+            transform: translateX(20px);
+        }
         :root {
             --bg: #0f0f12;
             --bg-card: #18181c;
@@ -17,6 +60,19 @@
             --text: #f4f4f5;
             --text-muted: #a1a1aa;
             --border: #27272a;
+            --success: #22c55e;
+            --error: #ef4444;
+        }
+        /* light theme overrides */
+        .light {
+            --bg: #ffffff;
+            --bg-card: #f3f4f6;
+            --bg-hover: #e5e7eb;
+            --accent: #6366f1;
+            --accent-hover: #818cf8;
+            --text: #111827;
+            --text-muted: #6b7280;
+            --border: #d1d5db;
             --success: #22c55e;
             --error: #ef4444;
         }
@@ -125,25 +181,70 @@
     {% block extra_css %}{% endblock %}
 </head>
 <body>
+    <div class="theme-switch-container">
+        <label class="switch">
+            <input type="checkbox" id="theme-toggle">
+            <span class="slider round"></span>
+        </label>
+    </div>
     <div class="layout">
         {% if user.is_authenticated %}
         <nav>
             <div class="nav-user">{{ user.get_username }}</div>
+            <!-- theme toggle switch will be moved to bottom -->
             <a href="{% url 'dashboard' %}" class="{% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}">Dashboard</a>
             <a href="{% url 'pos' %}" class="{% if request.resolver_match.url_name == 'pos' %}active{% endif %}">Point of Sale</a>
-            <a href="{% url 'product_list' %}" class="{% if request.resolver_match.url_name == 'product_list' or request.resolver_match.url_name == 'import_inventory' %}active{% endif %}">Inventory</a>
+            <a href="{% url 'cart' %}" class="{% if request.resolver_match.url_name == 'cart' %}active{% endif %}">Cart</a>
+            <h4 style="margin-left:1rem; color:var(--text-muted); font-weight:600; font-size:0.9rem;">Inventory</h4>
+            <a href="{% url 'product_list' %}" class="{% if request.resolver_match.url_name == 'product_list' or request.resolver_match.url_name == 'import_inventory' %}active{% endif %}">Items</a>
+            <a href="{% url 'warehouse_list' %}" class="{% if request.resolver_match.url_name == 'warehouse_list' %}active{% endif %}">Warehouses</a>
+            <a href="{% url 'stockmovement_list' %}" class="{% if request.resolver_match.url_name == 'stockmovement_list' %}active{% endif %}">Movements</a>
             <a href="{% url 'purchase_list' %}" class="{% if request.resolver_match.url_name == 'purchase_list' or request.resolver_match.url_name == 'purchase_add' %}active{% endif %}">Purchases</a>
-            <a href="{% url 'sales_report' %}" class="{% if request.resolver_match.url_name == 'sales_report' %}active{% endif %}">Sales Report</a>
+            <h4 style="margin-left:1rem; color:var(--text-muted); font-weight:600; font-size:0.9rem;">Sales</h4>
+            <a href="{% url 'sales_report' %}" class="{% if request.resolver_match.url_name == 'sales_report' %}active{% endif %}">Report</a>
+            <a href="{% url 'customer_list' %}" class="{% if request.resolver_match.url_name == 'customer_list' %}active{% endif %}">Customers</a>
+            <h4 style="margin-left:1rem; color:var(--text-muted); font-weight:600; font-size:0.9rem;">Accounting</h4>
+            <a href="{% url 'account_list' %}" class="{% if request.resolver_match.url_name == 'account_list' %}active{% endif %}">Accounts</a>
+            <a href="{% url 'journalentry_list' %}" class="{% if request.resolver_match.url_name == 'journalentry_list' %}active{% endif %}">Journal</a>
             <a href="{% url 'business_report' %}" class="{% if request.resolver_match.url_name == 'business_report' %}active{% endif %}">Business Report</a>
             {% if user.is_staff %}
             <a href="/admin/">Admin</a>
             {% endif %}
-            <a href="{% url 'logout' %}" style="margin-top: auto;">Logout</a>
+            <form method="post" action="{% url 'logout' %}" style="margin-top:auto;">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-secondary">Logout</button>
+            </form>
+        </nav>
+        {% else %}
+        <nav>
+            <a href="{% url 'login' %}" class="btn btn-secondary" style="margin:1rem;">Login</a>
         </nav>
         {% endif %}
         <main>
             {% block content %}{% endblock %}
         </main>
     </div>
+    <script>
+        // theme toggle logic using checkbox
+        const toggle = document.getElementById('theme-toggle');
+        const rootEl = document.documentElement;
+        function setTheme(name) {
+            if (name === 'light') {
+                rootEl.classList.add('light');
+                toggle.checked = true;
+            } else {
+                rootEl.classList.remove('light');
+                toggle.checked = false;
+            }
+            localStorage.setItem('theme', name);
+        }
+        // initialize on load
+        const saved = localStorage.getItem('theme');
+        if (saved === 'light') setTheme('light');
+        else setTheme('dark');
+        toggle.addEventListener('change', () => {
+            setTheme(toggle.checked ? 'light' : 'dark');
+        });
+    </script>
 </body>
 </html>

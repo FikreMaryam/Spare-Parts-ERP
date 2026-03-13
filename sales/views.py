@@ -11,7 +11,7 @@ from django.contrib.auth.decorators import permission_required
 
 
 from inventory.models import Product
-from .models import Sale, SaleItem
+from .models import Sale, SaleItem, Customer
 
 @login_required
 @permission_required('sales.add_sale', raise_exception=True)
@@ -44,7 +44,22 @@ def full_business_report(request):
 
 @login_required
 def pos_view(request):
+    # list products only; pricing and sale handled on separate page or via cart
     products = Product.objects.all()
+    cart = request.session.get("cart", {})
+    cart_prices = request.session.get("cart_prices", {})
+    cart_count = sum(cart.values())
+
+    # build cart items for preview
+    cart_items = []
+    for pid, qty in cart.items():
+        try:
+            prod = Product.objects.get(id=pid)
+            override = cart_prices.get(str(pid))
+            cart_items.append((prod, qty, override))
+        except Product.DoesNotExist:
+            pass
+
     q = request.GET.get("q", "").strip()
     if q:
         products = products.filter(
@@ -53,60 +68,191 @@ def pos_view(request):
             | Q(brand__icontains=q)
             | Q(compatibilities__name__icontains=q)
             | Q(compatibilities__make__name__icontains=q)
+            | Q(compatibilities__chassis_prefixes__icontains=q)
         ).distinct()
+    return render(request, "sales/pos.html", {"products": products, "cart_count": cart_count, "cart_items": cart_items})
 
+
+@login_required
+def add_to_cart(request, product_id):
+    """Add one unit of the given product to the session cart and redirect to cart."""
+    cart = request.session.get("cart", {})
+    cart[str(product_id)] = cart.get(str(product_id), 0) + 1
+    request.session["cart"] = cart
+    return redirect("cart")
+
+
+@login_required
+def remove_from_cart(request, product_id):
+    cart = request.session.get("cart", {})
+    cart.pop(str(product_id), None)
+    request.session["cart"] = cart
+    return redirect("cart")
+
+
+@login_required
+def cart_view(request):
+    """Display cart contents and handle checkout for multiple items."""
+    from .models import Sale, SaleItem, Customer
+
+    cart = request.session.get("cart", {})
+    prices = request.session.get("cart_prices", {})
+    products = []
+    for pid, qty in list(cart.items()):
+        try:
+            prod = Product.objects.get(id=pid)
+            override = prices.get(str(pid))
+            products.append((prod, qty, override))
+        except Product.DoesNotExist:
+            cart.pop(pid, None)
+    request.session["cart"] = cart
+
+    errors = []
     if request.method == "POST":
-        # Validate stock before processing
-        cart = []
-        errors = []
-        for product in products:
-            raw_qty = request.POST.get(f"qty_{product.id}", 0) or 0
+        # update quantities from form
+        new_cart = {}
+        for prod, oldqty, override in products:
+            raw = request.POST.get(f"qty_{prod.id}", "0") or "0"
             try:
-                qty = int(raw_qty)
+                q = int(raw)
             except (ValueError, TypeError):
-                qty = 0
-            if qty > 0:
-                if qty > product.quantity:
-                    errors.append(f"Insufficient stock for {product.name}: requested {qty}, only {product.quantity} available.")
+                q = 0
+            if q > 0:
+                if q > prod.quantity:
+                    errors.append(f"Insufficient stock for {prod.name}: requested {q}, only {prod.quantity} available.")
                 else:
-                    cart.append((product, qty))
+                    new_cart[str(prod.id)] = q
+        cart = new_cart
+        request.session["cart"] = cart
 
         if errors:
-            return render(request, "sales/pos.html", {
-                "products": products,
-                "errors": errors,
-            })
+            customers = Customer.objects.all()
+            prices = request.session.get("cart_prices", {})
+            return render(request, "sales/cart.html", {"products": products, "errors": errors, "customers": customers, "Sale": Sale, "prices": prices})
 
-        # determine price type (retail/wholesale) from submitted form (default retail)
-        price_type = request.POST.get('price_type', request.GET.get('price_type', 'retail'))
+        # no items
+        if not cart:
+            errors.append("No items in cart.")
+            customers = Customer.objects.all()
+            prices = request.session.get("cart_prices", {})
+            return render(request, "sales/cart.html", {"products": products, "errors": errors, "customers": customers, "Sale": Sale, "prices": prices})
 
+        # handle customer and payment similar to pos_single
+        customer_type = request.POST.get('customer_type', 'existing')
+        customer_name = request.POST.get('customer_name', '').strip()
+        new_name = request.POST.get('new_name', '').strip()
+        new_phone = request.POST.get('new_phone', '').strip()
+        payment = request.POST.get('payment_method', 'CASH')
+
+        cust = None
+        if customer_type == 'new' and new_name:
+            cust = Customer.objects.create(name=new_name, phone=new_phone)
+        elif customer_type == 'existing' and customer_name:
+            cust, _ = Customer.objects.get_or_create(name=customer_name)
+
+        # create sale
         with transaction.atomic():
-            sale = Sale.objects.create(payment_method="CASH")
+            sale = Sale.objects.create(payment_method=payment, customer=cust)
             total = 0
-
-            for product, qty in cart:
-                # choose unit price according to selected price type
-                if price_type == 'wholesale':
-                    unit_price = product.wholesale_price or product.selling_price
+            for prod, qty, override in products:
+                if str(prod.id) not in cart:
+                    continue
+                qty = cart[str(prod.id)]
+                # determine unit price: POST > session override > default
+                price_override = request.POST.get(f"price_{prod.id}", "").strip()
+                if price_override:
+                    try:
+                        unit_price = float(price_override)
+                    except ValueError:
+                        unit_price = 0
+                elif override is not None:
+                    unit_price = override
                 else:
-                    unit_price = product.selling_price
+                    unit_price = prod.selling_price
 
                 SaleItem.objects.create(
                     sale=sale,
-                    product=product,
+                    product=prod,
                     quantity=qty,
                     price=unit_price,
-                    cost_price=product.cost_price,
+                    cost_price=prod.cost_price,
                 )
-
                 total += qty * unit_price
 
             sale.total_amount = total
             sale.save()
-
+        # clear cart and prices
+        request.session["cart"] = {}
+        request.session["cart_prices"] = {}
         return redirect("invoice", sale.id)
 
-    return render(request, "sales/pos.html", {"products": products})
+    customers = Customer.objects.all()
+    prices = request.session.get("cart_prices", {})
+    return render(request, "sales/cart.html", {"products": products, "errors": errors, "customers": customers, "Sale": Sale, "prices": prices})
+
+
+@login_required
+def pos_single(request, product_id):
+    """Display a single-product form that allows adding to cart."""
+    product = get_object_or_404(Product, id=product_id)
+    errors = []
+    qty = 0
+    unit_price = product.selling_price
+
+    if request.method == 'POST':
+        raw_qty = request.POST.get('qty', '0') or '0'
+        try:
+            qty = int(raw_qty)
+        except (ValueError, TypeError):
+            qty = 0
+        if qty <= 0:
+            errors.append('Quantity must be greater than zero.')
+        elif qty > product.quantity:
+            errors.append(f'Insufficient stock for {product.name}.')
+
+        price_override = request.POST.get('price', '').strip()
+        if price_override:
+            try:
+                unit_price = float(price_override)
+            except ValueError:
+                unit_price = product.selling_price
+
+        if not errors:
+            cart = request.session.get('cart', {})
+            cart[str(product.id)] = qty
+            request.session['cart'] = cart
+            # store override price
+            prices = request.session.get('cart_prices', {})
+            if price_override:
+                prices[str(product.id)] = unit_price
+            request.session['cart_prices'] = prices
+            return redirect('cart')
+
+    return render(
+        request,
+        'sales/pos_single.html',
+        {
+            'product': product,
+            'errors': errors,
+            'qty': qty,
+            'unit_price': unit_price,
+        },
+    )
+
+
+@login_required
+def customer_list(request):
+    from .models import Customer
+    customers = Customer.objects.all()
+    return render(request, "sales/customer_list.html", {"customers": customers})
+
+
+@login_required
+def customer_detail(request, pk):
+    from .models import Customer
+    cust = get_object_or_404(Customer, id=pk)
+    sales = Sale.objects.filter(customer=cust).prefetch_related('items')
+    return render(request, "sales/customer_detail.html", {"customer": cust, "sales": sales})
 
 
 @login_required

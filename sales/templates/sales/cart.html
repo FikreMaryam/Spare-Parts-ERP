@@ -1,0 +1,99 @@
+{% extends "base.html" %}
+
+{% block title %}Cart - ERP My Shop{% endblock %}
+
+{% block extra_css %}
+<style>
+.cart-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+.cart-table th, .cart-table td {
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid var(--border);
+}
+.cart-table th { background: var(--bg-hover); color: var(--text-muted); }
+</style>
+{% endblock %}
+
+{% block content %}
+<h1><a href="{% url 'pos' %}">&larr; Continue Shopping</a></h1>
+{% if errors %}
+<div class="card errors"><ul>{% for e in errors %}<li>{{ e }}</li>{% endfor %}</ul></div>
+{% endif %}
+<form method="post">
+    {% csrf_token %}
+    <table class="cart-table">
+        <thead>
+            <tr>
+                <th>Product</th>
+                <th>Qty</th>
+                <th>Price</th>
+                <th>Remove</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for p, qty, override in products %}
+            <tr>
+                <td><a href="{% url 'product_detail' p.id %}">{{ p.name }}</a></td>
+                <td><input type="number" name="qty_{{ p.id }}" value="{{ qty }}" min="0" max="{{ p.quantity }}" style="width:60px;"></td>
+                <td><input type="number" step="0.01" name="price_{{ p.id }}" value="{% if override %}{{ override }}{% endif %}" placeholder="{{ p.selling_price }}" style="width:80px;"></td>
+                <td><a href="{% url 'remove_from_cart' p.id %}" class="btn-secondary btn">X</a></td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    <hr>
+    <!-- reuse customer/payment form from pos_single -->
+    <div class="customer-payment">
+        <div>
+            <p class="customer-choice">
+                <strong>Customer:</strong>
+                <label><input type="radio" name="customer_type" value="existing" checked> Existing</label>
+                <label><input type="radio" name="customer_type" value="new"> New</label>
+            </p>
+            <div id="existing-customer">
+                <input type="text" name="customer_name" placeholder="Type to search" list="cust-list">
+                <datalist id="cust-list">
+                    {% for c in customers %}
+                        <option value="{{ c.name }}">{{ c.phone }}</option>
+                    {% endfor %}
+                </datalist>
+            </div>
+            <div id="new-customer" style="display:none;">
+                <p><label>Name: <input type="text" name="new_name"></label></p>
+                <p><label>Phone: <input type="text" name="new_phone"></label></p>
+            </div>
+        </div>
+        <div>
+            <p><label>Payment method:</label>
+                <select name="payment_method" style="width:100%;">
+                    {% for code,label in Sale.PAYMENT_METHOD_CHOICES %}
+                        <option value="{{ code }}">{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </p>
+        </div>
+    </div>
+    <p style="text-align:center; margin-top:1rem;"><button type="submit" class="btn">Checkout</button></p>
+</form>
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const existingRadio = document.querySelector('input[name="customer_type"][value="existing"]');
+        const newRadio = document.querySelector('input[name="customer_type"][value="new"]');
+        const existingDiv = document.getElementById('existing-customer');
+        const newDiv = document.getElementById('new-customer');
+        function toggleCustomer() {
+            if (newRadio.checked) {
+                existingDiv.style.display = 'none';
+                newDiv.style.display = 'block';
+            } else {
+                existingDiv.style.display = 'block';
+                newDiv.style.display = 'none';
+            }
+        }
+        existingRadio.addEventListener('change', toggleCustomer);
+        newRadio.addEventListener('change', toggleCustomer);
+    });
+</script>
+{% endblock %}

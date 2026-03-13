@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+
+{% block title %}Stock Movements - ERP My Shop{% endblock %}
+
+{% block content %}
+<h1>Stock Movements</h1>
+<form method="get" class="card">
+    <input type="text" name="q" value="{{ search }}" placeholder="Search product / ref">
+    <select name="type">
+        <option value="">All types</option>
+        <option value="purchase" {% if filter_type == 'purchase' %}selected{% endif %}>Purchase</option>
+        <option value="sale" {% if filter_type == 'sale' %}selected{% endif %}>Sale</option>
+        <option value="adjustment" {% if filter_type == 'adjustment' %}selected{% endif %}>Adjustment</option>
+        <option value="transfer" {% if filter_type == 'transfer' %}selected{% endif %}>Transfer</option>
+    </select>
+    <button class="btn" type="submit">Filter</button>
+</form>
+<table class="card">
+    <thead>
+        <tr>
+            <th>Date</th>
+            <th>Product</th>
+            <th>Qty</th>
+            <th>Type</th>
+            <th>Warehouse</th>
+            <th>Reference</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for m in page.object_list %}
+        <tr>
+            <td>{{ m.timestamp }}</td>
+            <td><a href="{% url 'product_detail' m.product.id %}">{{ m.product.name }}</a></td>
+            <td>{{ m.quantity }}</td>
+            <td>{{ m.get_movement_type_display }}</td>
+            <td>{% if m.warehouse %}<a href="{% url 'warehouse_list' %}#">{{ m.warehouse.name }}</a>{% else %}—{% endif %}</td>
+            <td>{{ m.reference }}</td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="6">No movements.</td></tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% if page.has_other_pages %}
+<div class="pagination">
+    {% if page.has_previous %}<a href="?page={{ page.previous_page_number }}" class="btn btn-secondary">← Prev</a>{% endif %}
+    <span class="page-info">Page {{ page.number }} of {{ page.paginator.num_pages }}</span>
+    {% if page.has_next %}<a href="?page={{ page.next_page_number }}" class="btn btn-secondary">Next →</a>{% endif %}
+</div>
+{% endif %}
+{% endblock %}

@@ -38,6 +38,7 @@ def product_list(request):
             | Q(purpose__icontains=q)
             | Q(compatibilities__name__icontains=q)
             | Q(compatibilities__make__name__icontains=q)
+            | Q(compatibilities__chassis_prefixes__icontains=q)
         ).distinct()
 
     # Filters
@@ -119,6 +120,7 @@ def export_inventory(request):
             | Q(purpose__icontains=q)
             | Q(compatibilities__name__icontains=q)
             | Q(compatibilities__make__name__icontains=q)
+            | Q(compatibilities__chassis_prefixes__icontains=q)
         ).distinct()
     category_id = request.GET.get("category", "")
     if category_id:
@@ -140,7 +142,7 @@ def export_inventory(request):
 
     headers = [
         "Part Number", "Name", "Brand", "Category", "Quantity",
-        "Cost Price", "Selling Price", "Location", "Purpose", "Vehicle/Car Types"
+        "Cost Price", "Selling Price", "Location", "Purpose", "Vehicle/Car Types / Chassis"
     ]
     for col, header in enumerate(headers, 1):
         ws.cell(row=1, column=col, value=header)
@@ -278,6 +280,49 @@ def import_inventory(request):
 
 
 @login_required
+def warehouse_list(request):
+    """Show all warehouses."""
+    from .models import Warehouse
+    warehouses = Warehouse.objects.all()
+    return render(request, "inventory/warehouse_list.html", {"warehouses": warehouses})
+
+
+@login_required
+def stockmovement_list(request):
+    """Display all stock movements with optional filters."""
+    from .models import StockMovement
+    movements = StockMovement.objects.select_related("product", "warehouse").order_by("-timestamp")
+    # simple filtering by type or product name
+    mtype = request.GET.get("type", "")
+    if mtype:
+        movements = movements.filter(movement_type=mtype)
+    q = request.GET.get("q", "").strip()
+    if q:
+        movements = movements.filter(
+            Q(product__name__icontains=q) | Q(reference__icontains=q)
+        )
+    paginator = Paginator(movements, 25)
+    page = paginator.get_page(request.GET.get("page", 1))
+    return render(request, "inventory/stockmovement_list.html", {"page": page, "filter_type": mtype, "search": q})
+
+
+@login_required
+def account_list(request):
+    from .models import Account
+    accounts = Account.objects.select_related("parent").order_by("code", "name")
+    return render(request, "inventory/account_list.html", {"accounts": accounts})
+
+
+@login_required
+def journalentry_list(request):
+    from .models import JournalEntry
+    entries = JournalEntry.objects.select_related("debit_account", "credit_account").order_by("-date")
+    paginator = Paginator(entries, 25)
+    page = paginator.get_page(request.GET.get("page", 1))
+    return render(request, "inventory/journalentry_list.html", {"page": page})
+
+
+@login_required
 def purchase_list(request):
     """List all purchases with date filter."""
     from django.db.models import Sum
@@ -285,16 +330,24 @@ def purchase_list(request):
     purchases = Purchase.objects.prefetch_related("items").select_related("supplier").order_by("-date")
     date_from = request.GET.get("date_from", "")
     date_to = request.GET.get("date_to", "")
+    warehouse_id = request.GET.get("warehouse", "")
     if date_from:
         purchases = purchases.filter(date__date__gte=date_from)
     if date_to:
         purchases = purchases.filter(date__date__lte=date_to)
+    if warehouse_id:
+        purchases = purchases.filter(warehouse_id=warehouse_id)
     total_bought = sum(p.total_amount for p in purchases)
+    # supply warehouses for filter dropdown
+    from .models import Warehouse
+    warehouses = Warehouse.objects.all().order_by("name")
     return render(request, "inventory/purchase_list.html", {
         "purchases": purchases,
         "date_from": date_from,
         "date_to": date_to,
         "total_bought": total_bought,
+        "warehouses": warehouses,
+        "filter_warehouse": warehouse_id,
     })
 
 

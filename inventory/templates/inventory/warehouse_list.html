@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+
+{% block title %}Warehouses - ERP My Shop{% endblock %}
+
+{% block content %}
+<h1>Warehouses</h1>
+<ul>
+    {% for w in warehouses %}
+    <li>{{ w.name }}{% if w.location %} ({{ w.location }}){% endif %}</li>
+    {% empty %}
+    <li>No warehouses defined.</li>
+    {% endfor %}
+</ul>
+{% endblock %}

@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+
+{% block title %}Customer - {{ customer.name }}{% endblock %}
+
+{% block content %}
+<h1>{{ customer.name }}</h1>
+<p>
+    {% if customer.phone %}Phone: {{ customer.phone }}<br>{% endif %}
+    {% if customer.email %}Email: {{ customer.email }}<br>{% endif %}
+    {% if customer.address %}Address: {{ customer.address }}<br>{% endif %}
+</p>
+<h2>Purchase history</h2>
+{% if sales %}
+<table class="card">
+    <thead><tr><th>ID</th><th>Date</th><th>Total</th><th>Method</th></tr></thead>
+    <tbody>
+    {% for s in sales %}
+    <tr>
+        <td><a href="{% url 'invoice' s.id %}">{{ s.id }}</a></td>
+        <td>{{ s.date|date:"M d, Y" }}</td>
+        <td>{{ s.total_amount|floatformat:2 }}</td>
+        <td>{{ s.payment_method }}</td>
+    </tr>
+    {% endfor %}
+    </tbody>
+</table>
+{% else %}
+<p>No sales yet.</p>
+{% endif %}
+{% endblock %}

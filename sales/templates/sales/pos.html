@@ -2,8 +2,52 @@
 
 {% block title %}Point of Sale - ERP My Shop{% endblock %}
 
+{% block extra_css %}
+<style>
+.product-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill,minmax(220px,1fr));
+    gap: 1rem;
+}
+.product-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1rem;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+.product-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+}
+.product-card h3 { margin: 0 0 0.5rem; font-size: 1.1rem; }
+.product-card p { margin: 0.25rem 0; font-size: 0.9rem; color: var(--text-muted); }
+</style>
+{% endblock %}
+
 {% block content %}
 <h1>Point of Sale</h1>
+<p><a href="{% url 'cart' %}" class="btn btn-secondary">Cart ({{ cart_count|default:0 }})</a></p>
+<!-- floating popup trigger -->
+<div id="cart-popup-trigger" class="btn btn-secondary" title="View Cart" style="position:fixed;bottom:20px;right:20px;cursor:pointer;z-index:1000;">
+    🛒 ({{ cart_count|default:0 }})
+</div>
+<div id="cart-popup" style="display:none;position:fixed;bottom:60px;right:20px;width:300px;background:var(--bg-card);border:1px solid var(--border);border-radius:8px;padding:1rem;z-index:1001;">
+    <h4>Cart</h4>
+    {% if cart_items %}
+    <ul style="list-style:none;padding:0;margin:0;">
+        {% for p,qty,override in cart_items %}
+        <li>{{ p.name }} × {{ qty }}{% if override %} @ {{ override }}{% endif %}</li>
+        {% endfor %}
+    </ul>
+    <p style="margin-top:0.5rem;text-align:center;"><a href="{% url 'cart' %}" class="btn">Go to Cart</a></p>
+    {% else %}
+    <p>Cart is empty</p>
+    {% endif %}
+</div>
 <form method="get" style="margin-bottom:1rem;">
     <input type="text" name="q" placeholder="Search part, OEM, brand, car model..." value="{{ request.GET.q }}" style="width:300px; padding:0.4rem;">
     <label style="margin-left:1rem;">
@@ -29,45 +73,24 @@
 <div class="card">
     <form method="post" id="sale-form">
         {% csrf_token %}
-        <table>
-            <thead>
-                <tr>
-                            <th>Product</th>
-                    <th>Cost</th>
-                    <th>Retail</th>
-                    <th>Wholesale</th>
-                    <th>Stock</th>
-                    <th>Qty</th>
-                    <th>Total</th>
-                    <th>Profit</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for p in products %}
-                <tr>
-                    <td><a href="{% url 'product_detail' p.id %}">{{ p.name }}</a></td>
-                    <td>{{ p.cost_price|floatformat:2 }}</td>
-                    <td>{{ p.selling_price|floatformat:2 }}</td>
-                    <td>{{ p.wholesale_price|floatformat:2 }}</td>
-                    <td>{{ p.quantity }}</td>
-                    <td>
-                        <input type="number" name="qty_{{ p.id }}"
-                               data-retail="{{ p.selling_price }}"
-                               data-wholesale="{{ p.wholesale_price }}"
-                               data-cost="{{ p.cost_price }}"
-                               min="0" max="{{ p.quantity }}" value="0"
-                               style="width: 80px;" class="qty-input">
-                    </td>
-                    <td class="line-total">0.00</td>
-                    <td class="line-profit">0.00</td>
-                </tr>
-                {% empty %}
-                <tr>
-                    <td colspan="7">No products available. Add products via Admin.</td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+        <!-- step guidance -->
+        <p>Select a product from the list to open the sale form.</p>
+        <div class="product-grid">
+    {% for p in products %}
+    <div class="product-card">
+        <h3>{{ p.name }}</h3>
+        <p>Part #: {{ p.part_number|default:'—' }}</p>
+        <p>Brand: {{ p.brand|default:'—' }}</p>
+        <p>Stock: {{ p.quantity }}</p>
+        <div style="margin-top:0.5rem; display:flex; gap:0.5rem;">
+            <a href="{% url 'pos_single' p.id %}" class="btn">Sell</a>
+            <a href="{% url 'add_to_cart' p.id %}" class="btn-secondary btn">Add to Cart</a>
+        </div>
+    </div>
+    {% empty %}
+    <p>No products available. Add products via Admin.</p>
+    {% endfor %}
+</div>
         <p style="margin-top: 1rem;">
             <label>Price type:
                 <select id="price-type-select" name="price_type" form="sale-form">
@@ -78,47 +101,25 @@
             <strong style="margin-left:1rem;">Grand Total: <span id="grand-total">0.00</span></strong>
             &nbsp;&nbsp;<strong>Estimated Profit: <span id="grand-profit">0.00</span></strong>
         </p>
-        <p style="margin-top: 0.5rem;">
-            <button type="submit" class="btn">Complete Sale</button>
-        </p>
+        <!-- customer/payment section moved below product table -->
+        <hr>
     </form>
-    <script>
-        // calculate totals as quantity inputs change
-        document.addEventListener('DOMContentLoaded', function() {
-            const qtyInputs = document.querySelectorAll('.qty-input');
-            const grandTotalEl = document.getElementById('grand-total');
-
-            function recalc() {
-                let grand = 0;
-                let grandProfit = 0;
-                const priceType = document.getElementById('price-type-select').value;
-                qtyInputs.forEach(function(inp) {
-                    const qty = parseFloat(inp.value) || 0;
-                    const retail = parseFloat(inp.dataset.retail) || 0;
-                    const wholesale = parseFloat(inp.dataset.wholesale) || 0;
-                    const cost = parseFloat(inp.dataset.cost) || 0;
-                    const price = priceType === 'wholesale' ? wholesale : retail;
-                    const line = qty * price;
-                    const profit = qty * (price - cost);
-                    const row = inp.closest('tr');
-                    const totalCell = row.querySelector('.line-total');
-                    const profitCell = row.querySelector('.line-profit');
-                    if (totalCell) {
-                        totalCell.textContent = line.toFixed(2);
-                    }
-                    if (profitCell) {
-                        profitCell.textContent = profit.toFixed(2);
-                    }
-                    grand += line;
-                    grandProfit += profit;
-                });
-                grandTotalEl.textContent = grand.toFixed(2);
-                document.getElementById('grand-profit').textContent = grandProfit.toFixed(2);
-            }
-            qtyInputs.forEach(function(inp) {
-                inp.addEventListener('input', recalc);
-            });
-        });
-    </script>
 </div>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    var trigger = document.getElementById('cart-popup-trigger');
+    var popup = document.getElementById('cart-popup');
+    if (trigger && popup) {
+        trigger.addEventListener('click', function(e) {
+            e.stopPropagation();
+            popup.style.display = popup.style.display === 'block' ? 'none' : 'block';
+        });
+        document.addEventListener('click', function(e) {
+            if (!popup.contains(e.target) && e.target !== trigger) {
+                popup.style.display = 'none';
+            }
+        });
+    }
+});
+</script>
 {% endblock %}

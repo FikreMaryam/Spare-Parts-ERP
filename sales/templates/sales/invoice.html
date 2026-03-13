@@ -8,6 +8,7 @@
 <div class="card">
     <p><strong>Date:</strong> {{ sale.date|date:"F d, Y H:i" }}</p>
     <p><strong>Payment:</strong> {{ sale.payment_method }}</p>
+    {% if sale.customer %}<p><strong>Customer:</strong> {{ sale.customer.name }}</p>{% endif %}
 </div>
 
 <div class="card">
@@ -24,7 +25,7 @@
         <tbody>
             {% for item in sale.items.all %}
             <tr>
-                <td><a href="{% url 'product_detail' item.product.id %}">{{ item.product.name }}</a></td>
+                <td><a href="{% url 'product_detail' item.product.id %}">{{ item.product.name }}</a> (<small>{{ item.product.part_number }}</small>)<br><small>{{ item.product.brand }}</small></td>
                 <td>{{ item.quantity }}</td>
                 <td>{{ item.price|floatformat:2 }}</td>
                 <td>{{ item.cost_price|floatformat:2 }}</td>
