@@ -30,13 +30,14 @@ def product_detail(request, pk):
 def add_to_cart(request, pk):
     product = get_object_or_404(Product, pk=pk, quantity__gt=0)
     cart = request.session.get('store_cart', {})
-    cart[str(pk)] = cart.get(str(pk), 0) + 1
+    qty = int(request.POST.get('quantity', 1))
+    cart[str(pk)] = cart.get(str(pk), 0) + qty
     if cart[str(pk)] > product.quantity:
         cart[str(pk)] = product.quantity
         messages.warning(request, f"Only {product.quantity} available in stock.")
     request.session['store_cart'] = cart
-    messages.success(request, f"Added {product.name} to cart.")
-    return redirect('product_detail', pk=pk)
+    messages.success(request, f"Added {qty} x {product.name} to cart.")
+    return redirect('cart')
 
 def cart_view(request):
     cart = request.session.get('store_cart', {})
@@ -57,9 +58,9 @@ def cart_view(request):
     return render(request, 'store/cart.html', {'items': items, 'total': total})
 
 def update_cart(request, pk):
-    if request.method == 'POST':
-        qty = int(request.POST.get('quantity', 0))
-        cart = request.session.get('store_cart', {})
+    cart = request.session.get('store_cart', {})
+    if request.method in ['POST', 'GET']:
+        qty = int(request.POST.get('quantity', request.GET.get('quantity', 0)))
         if qty > 0:
             try:
                 prod = Product.objects.get(pk=pk)

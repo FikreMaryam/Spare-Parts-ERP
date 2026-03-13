@@ -80,7 +80,12 @@
                 <p><strong>Description:</strong> {{ product.purpose|default:"No description available." }}</p>
                 <p><strong>Vehicle Applications:</strong> {{ product.vehicle_application|default:"N/A" }}</p>
                 <p><strong>Compatible Models:</strong> {% for model in product.compatibilities.all %}{{ model.name }}{% if not forloop.last %}, {% endif %}{% endfor %}</p>
-                <a href="{% url 'add_to_cart' product.pk %}" class="btn">Add to Cart</a>
+                <form method="post" action="{% url 'add_to_cart' product.pk %}" style="display: inline-block; margin-right: 1rem;">
+                    {% csrf_token %}
+                    <label for="qty">Qty:</label>
+                    <input type="number" id="qty" name="quantity" value="1" min="1" max="{{ product.quantity }}" style="width: 60px; margin: 0 0.5rem;">
+                    <button type="submit" class="btn">Add to Cart</button>
+                </form>
                 <a href="{% url 'store_home' %}" class="btn btn-secondary">Back to Products</a>
         </div>
     </main>
