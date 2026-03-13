@@ -40,7 +40,7 @@ def add_to_cart(request, pk):
 
 def cart_view(request):
     cart = request.session.get('store_cart', {})
-    products = []
+    items = []
     total = 0
     for pk, qty in cart.items():
         try:
@@ -48,12 +48,13 @@ def cart_view(request):
             if qty > prod.quantity:
                 qty = prod.quantity
                 cart[pk] = qty
-            products.append((prod, qty))
-            total += prod.selling_price * qty
+            subtotal = prod.selling_price * qty
+            items.append({'product': prod, 'qty': qty, 'subtotal': subtotal})
+            total += subtotal
         except Product.DoesNotExist:
             del cart[pk]
     request.session['store_cart'] = cart
-    return render(request, 'store/cart.html', {'products': products, 'total': total})
+    return render(request, 'store/cart.html', {'items': items, 'total': total})
 
 def update_cart(request, pk):
     if request.method == 'POST':
@@ -79,7 +80,7 @@ def checkout(request):
         messages.error(request, "Your cart is empty.")
         return redirect('store_home')
     
-    products = []
+    items = []
     total = 0
     for pk, qty in cart.items():
         try:
@@ -87,8 +88,9 @@ def checkout(request):
             if qty > prod.quantity:
                 messages.error(request, f"Insufficient stock for {prod.name}.")
                 return redirect('cart')
-            products.append((prod, qty))
-            total += prod.selling_price * qty
+            subtotal = prod.selling_price * qty
+            items.append({'product': prod, 'qty': qty, 'subtotal': subtotal})
+            total += subtotal
         except Product.DoesNotExist:
             messages.error(request, "Some items are no longer available.")
             return redirect('cart')
@@ -118,7 +120,9 @@ def checkout(request):
                 customer=customer
             )
             
-            for prod, qty in products:
+            for item in items:
+                prod = item['product']
+                qty = item['qty']
                 SaleItem.objects.create(
                     sale=sale,
                     product=prod,
@@ -139,7 +143,7 @@ def checkout(request):
             messages.success(request, f"Order placed successfully! Order ID: {sale.id}")
             return redirect('order_success', sale_id=sale.id)
     
-    return render(request, 'store/checkout.html', {'products': products, 'total': total})
+    return render(request, 'store/checkout.html', {'items': items, 'total': total})
 
 def order_success(request, sale_id):
     sale = get_object_or_404(Sale, id=sale_id)

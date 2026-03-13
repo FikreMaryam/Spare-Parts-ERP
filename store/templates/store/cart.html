@@ -86,19 +86,19 @@
                 </tr>
             </thead>
             <tbody>
-                {% for product, qty in products %}
+                {% for item in items %}
                 <tr>
-                    <td>{{ product.name }}</td>
-                    <td>${{ product.selling_price }}</td>
+                    <td>{{ item.product.name }}</td>
+                    <td>${{ item.product.selling_price }}</td>
                     <td>
-                        <form method="post" action="{% url 'update_cart' product.pk %}" style="display: inline;">
+                        <form method="post" action="{% url 'update_cart' item.product.pk %}" style="display: inline;">
                             {% csrf_token %}
-                            <input type="number" name="quantity" value="{{ qty }}" min="0" max="{{ product.quantity }}" style="width: 60px;">
+                            <input type="number" name="quantity" value="{{ item.qty }}" min="0" max="{{ item.product.quantity }}" style="width: 60px;">
                             <button type="submit" class="btn btn-secondary">Update</button>
                         </form>
                     </td>
-                    <td>${{ product.selling_price|mul:qty }}</td>
-                    <td><a href="{% url 'update_cart' product.pk %}?quantity=0" class="btn btn-danger">Remove</a></td>
+                    <td>${{ item.subtotal }}</td>
+                    <td><a href="{% url 'update_cart' item.product.pk %}?quantity=0" class="btn btn-danger">Remove</a></td>
                 </tr>
                 {% endfor %}
             </tbody>

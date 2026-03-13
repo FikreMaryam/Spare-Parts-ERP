@@ -100,8 +100,8 @@
             </div>
             <div class="order-summary">
                 <h3>Order Summary</h3>
-                {% for product, qty in products %}
-                <p>{{ product.name }} x {{ qty }} - ${{ product.selling_price|mul:qty }}</p>
+                {% for item in items %}
+                <p>{{ item.product.name }} x {{ item.qty }} - ${{ item.subtotal }}</p>
                 {% endfor %}
                 <p class="total">Total: ${{ total }}</p>
             </div>
