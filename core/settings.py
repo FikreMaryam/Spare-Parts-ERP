@@ -43,6 +43,8 @@ INSTALLED_APPS = [
     "inventory.apps.InventoryConfig", 
     'sales.apps.SalesConfig',
     'expenses',
+    'hr',
+    'store',
 ]
 
 LOGIN_URL = "login"

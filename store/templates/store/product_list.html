@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Spare Parts Shop</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #007bff;
+            --secondary: #6c757d;
+            --success: #28a745;
+            --danger: #dc3545;
+            --warning: #ffc107;
+            --info: #17a2b8;
+            --light: #f8f9fa;
+            --dark: #343a40;
+            --bg: #ffffff;
+            --text: #212529;
+            --text-muted: #6c757d;
+            --border: #dee2e6;
+            --shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        * { box-sizing: border-box; }
+        body {
+            font-family: 'DM Sans', sans-serif;
+            margin: 0;
+            padding: 0;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.6;
+        }
+        .container { max-width: 1200px; margin: 0 auto; padding: 0 1rem; }
+        header {
+            background: var(--dark);
+            color: white;
+            padding: 1rem 0;
+        }
+        header .container { display: flex; justify-content: space-between; align-items: center; }
+        h1 { margin: 0; }
+        nav a { color: white; text-decoration: none; margin-left: 1rem; }
+        .search-form { display: flex; gap: 0.5rem; }
+        .search-form input, .search-form select, .search-form button {
+            padding: 0.5rem;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+        }
+        .products { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 1rem; margin: 2rem 0; }
+        .product-card {
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 1rem;
+            text-align: center;
+            transition: box-shadow 0.2s;
+        }
+        .product-card:hover { box-shadow: var(--shadow); }
+        .product-card img { max-width: 100%; height: 150px; object-fit: cover; border-radius: 4px; }
+        .product-card h3 { margin: 0.5rem 0; }
+        .product-card p { color: var(--text-muted); }
+        .btn {
+            display: inline-block;
+            padding: 0.5rem 1rem;
+            background: var(--primary);
+            color: white;
+            text-decoration: none;
+            border-radius: 4px;
+            border: none;
+            cursor: pointer;
+        }
+        .btn:hover { background: #0056b3; }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="container">
+            <h1>Spare Parts Shop</h1>
+            <nav>
+                <a href="{% url 'store_home' %}">Home</a>
+            </nav>
+        </div>
+    </header>
+    <main class="container">
+        <h2>Our Products</h2>
+        <form class="search-form" method="get">
+            <input type="text" name="q" placeholder="Search products..." value="{{ q }}">
+            <select name="category">
+                <option value="">All Categories</option>
+                {% for cat in categories %}
+                <option value="{{ cat.id }}" {% if selected_category == cat.id|stringformat:"s" %}selected{% endif %}>{{ cat.name }}</option>
+                {% endfor %}
+            </select>
+            <button type="submit" class="btn">Search</button>
+        </form>
+        <div class="products">
+            {% for product in products %}
+            <div class="product-card">
+                <h3>{{ product.name }}</h3>
+                <p>{{ product.brand }}</p>
+                <p>Price: ${{ product.selling_price }}</p>
+                <p>In Stock: {{ product.quantity }}</p>
+                <a href="{% url 'product_detail' product.pk %}" class="btn">View Details</a>
+            </div>
+            {% endfor %}
+        </div>
+        {% if not products %}
+        <p>No products found.</p>
+        {% endif %}
+    </main>
+</body>
+</html>

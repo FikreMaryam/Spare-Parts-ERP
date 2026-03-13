@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+
+{% block title %}Employees{% endblock %}
+
+{% block content %}
+<h1>Employee List</h1>
+{% if employees %}
+<table class="card">
+    <thead>
+        <tr>
+            <th>Employee ID</th>
+            <th>Name</th>
+            <th>Role</th>
+            <th>Hire Date</th>
+            <th>Salary</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for emp in employees %}
+        <tr>
+            <td>{{ emp.employee_id }}</td>
+            <td>{{ emp.user.get_full_name|default:emp.user.username }}</td>
+            <td>{{ emp.get_role_display }}</td>
+            <td>{{ emp.hire_date }}</td>
+            <td>${{ emp.salary }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% else %}
+<p>No employees registered yet.</p>
+{% endif %}
+{% endblock %}

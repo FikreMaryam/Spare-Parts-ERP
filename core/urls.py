@@ -13,6 +13,8 @@ urlpatterns = [
     path("dashboard/", dashboard_view, name="dashboard"),
     path("sales/", include("sales.urls")),
     path("inventory/", include("inventory.urls")),
+    path("hr/", include("hr.urls")),
+    path("store/", include("store.urls")),
 ]
 
 

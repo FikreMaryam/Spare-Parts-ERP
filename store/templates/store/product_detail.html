@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ product.name }} - Spare Parts Shop</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #007bff;
+            --secondary: #6c757d;
+            --success: #28a745;
+            --danger: #dc3545;
+            --warning: #ffc107;
+            --info: #17a2b8;
+            --light: #f8f9fa;
+            --dark: #343a40;
+            --bg: #ffffff;
+            --text: #212529;
+            --text-muted: #6c757d;
+            --border: #dee2e6;
+            --shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        * { box-sizing: border-box; }
+        body {
+            font-family: 'DM Sans', sans-serif;
+            margin: 0;
+            padding: 0;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.6;
+        }
+        .container { max-width: 1200px; margin: 0 auto; padding: 0 1rem; }
+        header {
+            background: var(--dark);
+            color: white;
+            padding: 1rem 0;
+        }
+        header .container { display: flex; justify-content: space-between; align-items: center; }
+        h1 { margin: 0; }
+        nav a { color: white; text-decoration: none; margin-left: 1rem; }
+        .product-detail { display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; margin: 2rem 0; }
+        .product-info h2 { margin-top: 0; }
+        .btn {
+            display: inline-block;
+            padding: 0.5rem 1rem;
+            background: var(--primary);
+            color: white;
+            text-decoration: none;
+            border-radius: 4px;
+            border: none;
+            cursor: pointer;
+        }
+        .btn:hover { background: #0056b3; }
+        .btn-secondary { background: var(--secondary); }
+        .btn-secondary:hover { background: #545b62; }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="container">
+            <h1>Spare Parts Shop</h1>
+            <nav>
+                <a href="{% url 'store_home' %}">Home</a>
+            </nav>
+        </div>
+    </header>
+    <main class="container">
+        <div class="product-detail">
+            <div>
+                <h2>{{ product.name }}</h2>
+                <p><strong>Brand:</strong> {{ product.brand|default:"N/A" }}</p>
+                <p><strong>Part Number:</strong> {{ product.part_number|default:"N/A" }}</p>
+                <p><strong>SKU:</strong> {{ product.sku|default:"N/A" }}</p>
+                <p><strong>Price:</strong> ${{ product.selling_price }}</p>
+                <p><strong>In Stock:</strong> {{ product.quantity }}</p>
+                <p><strong>Description:</strong> {{ product.purpose|default:"No description available." }}</p>
+                <p><strong>Vehicle Applications:</strong> {{ product.vehicle_application|default:"N/A" }}</p>
+                <p><strong>Compatible Models:</strong> {% for model in product.compatibilities.all %}{{ model.name }}{% if not forloop.last %}, {% endif %}{% endfor %}</p>
+            </div>
+            <div>
+                <a href="{% url 'store_home' %}" class="btn btn-secondary">Back to Products</a>
+                <!-- Add to cart or inquiry button could go here -->
+                <p>Contact us for purchase inquiries.</p>
+            </div>
+        </div>
+    </main>
+</body>
+</html>
