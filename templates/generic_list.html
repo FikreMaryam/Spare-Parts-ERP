@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+
+{% block title %}{{ model_name }} List - Spare ERP{% endblock %}
+
+{% block page_title %}{{ model_name }}s{% endblock %}
+
+{% block content %}
+<div class="header-actions">
+    {% if request.user.is_superuser %}
+    <a href="{% url create_url_name %}" class="btn btn-sm">Add New {{ model_name }}</a>
+    {% endif %}
+</div>
+
+<div class="card table-card">
+    <div class="card-header">
+        <span class="text-muted">Showing {{ objects|length }} items</span>
+    </div>
+    <div class="table-container">
+        <table class="sortable-table">
+            <thead>
+                <tr>
+                    <th class="pl-4">Name / Display</th>
+                    {% if request.user.is_superuser %}
+                    <th class="actions-col">Actions</th>
+                    {% endif %}
+                </tr>
+            </thead>
+            <tbody>
+                {% for object in objects %}
+                <tr>
+                    <td class="pl-4 fw-600">{{ object }}</td>
+                    {% if request.user.is_superuser %}
+                    <td class="actions-col">
+                        <a href="{% url update_url_name object.pk %}" class="btn btn-secondary btn-sm">Edit</a>
+                        <a href="{% url delete_url_name object.pk %}" class="btn btn-danger btn-sm">Delete</a>
+                    </td>
+                    {% endif %}
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="2" class="empty-state">
+                        <p>No {{ model_name|lower }}s found.</p>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+{% endblock %}

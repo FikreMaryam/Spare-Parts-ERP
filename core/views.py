@@ -1,6 +1,9 @@
 from django.shortcuts import redirect, render
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.views import LoginView
+from django.contrib.auth import login, get_user_model
+from django.http import HttpResponseForbidden
+from django.core import signing
 from django.urls import reverse_lazy
 from django.db.models import Sum
 
@@ -55,3 +58,26 @@ def root_redirect(request):
     if request.user.is_authenticated:
         return redirect("dashboard")
     return redirect("home")
+
+
+def impersonate_auth(request):
+    """Verifies an impersonation token from the public schema and logs the user in."""
+    token = request.GET.get("token")
+    if not token:
+        return HttpResponseForbidden("Missing token.")
+
+    try:
+        # Token is valid for 5 minutes
+        data = signing.loads(token, salt="impersonate", max_age=300)
+    except signing.BadSignature:
+        return HttpResponseForbidden("Invalid or expired token.")
+
+    user_id = data.get("user_id")
+    User = get_user_model()
+    try:
+        user = User.objects.get(id=user_id)
+        # Specify backend to avoid MultipleAuthBackends issues
+        login(request, user, backend="django.contrib.auth.backends.ModelBackend")
+        return redirect("dashboard")
+    except User.DoesNotExist:
+        return HttpResponseForbidden("User not found in tenant.")

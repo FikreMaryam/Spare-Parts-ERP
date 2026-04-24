@@ -1,4 +1,5 @@
 from django.db import models
+from django.contrib.auth.models import User
 from inventory.models import Product
 
 
@@ -14,6 +15,19 @@ class Customer(models.Model):
         return self.name
 
 
+class Cart(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    product = models.ForeignKey(Product, on_delete=models.CASCADE)
+    quantity = models.PositiveIntegerField(default=1)
+    price_override = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+
+    class Meta:
+        unique_together = ('user', 'product')
+
+    def __str__(self):
+        return f"{self.user.username} - {self.product.name} x {self.quantity}"
+
+
 class Sale(models.Model):
     PAYMENT_METHOD_CHOICES = [
         ("CASH", "Cash"),
@@ -24,6 +38,13 @@ class Sale(models.Model):
         ("OTHER", "Other"),
     ]
 
+    STATUS_CHOICES = [
+        ("PENDING", "Pending Approval"),
+        ("APPROVED", "Approved"),
+        ("SHIPPED", "Shipped"),
+        ("CANCELLED", "Cancelled"),
+    ]
+
     date = models.DateTimeField(auto_now_add=True)
     payment_method = models.CharField(
         max_length=20,
@@ -31,6 +52,7 @@ class Sale(models.Model):
         default="CASH",
     )
     total_amount = models.FloatField(default=0)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="APPROVED")
     customer = models.ForeignKey(
         "sales.Customer",
         null=True,

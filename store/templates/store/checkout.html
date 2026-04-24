@@ -1,111 +1,50 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Checkout - Spare Parts Shop</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700&display=swap" rel="stylesheet">
-    <style>
-        :root {
-            --primary: #007bff;
-            --secondary: #6c757d;
-            --success: #28a745;
-            --danger: #dc3545;
-            --warning: #ffc107;
-            --info: #17a2b8;
-            --light: #f8f9fa;
-            --dark: #343a40;
-            --bg: #ffffff;
-            --text: #212529;
-            --text-muted: #6c757d;
-            --border: #dee2e6;
-            --shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }
-        * { box-sizing: border-box; }
-        body {
-            font-family: 'DM Sans', sans-serif;
-            margin: 0;
-            padding: 0;
-            background: var(--bg);
-            color: var(--text);
-            line-height: 1.6;
-        }
-        .container { max-width: 1200px; margin: 0 auto; padding: 0 1rem; }
-        header {
-            background: var(--dark);
-            color: white;
-            padding: 1rem 0;
-        }
-        header .container { display: flex; justify-content: space-between; align-items: center; }
-        h1 { margin: 0; }
-        nav a { color: white; text-decoration: none; margin-left: 1rem; }
-        .checkout { display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; margin: 2rem 0; }
-        .order-summary { border: 1px solid var(--border); padding: 1rem; border-radius: 8px; }
-        .form-group { margin-bottom: 1rem; }
-        .form-group label { display: block; margin-bottom: 0.5rem; }
-        .form-group input, .form-group textarea { width: 100%; padding: 0.5rem; border: 1px solid var(--border); border-radius: 4px; }
-        .btn {
-            display: inline-block;
-            padding: 0.5rem 1rem;
-            background: var(--primary);
-            color: white;
-            text-decoration: none;
-            border-radius: 4px;
-            border: none;
-            cursor: pointer;
-        }
-        .btn:hover { background: #0056b3; }
-        .btn-secondary { background: var(--secondary); }
-        .btn-secondary:hover { background: #545b62; }
-        .total { font-size: 1.2rem; font-weight: bold; }
-    </style>
-</head>
-<body>
-    <header>
-        <div class="container">
-            <h1>Spare Parts Shop</h1>
-            <nav>
-                <a href="{% url 'store_home' %}">Home</a>
-                <a href="{% url 'cart' %}">Cart</a>
-            </nav>
-        </div>
-    </header>
-    <main class="container">
-        <h2>Checkout</h2>
-        <div class="checkout">
-            <div>
-                <h3>Shipping Information</h3>
-                <form method="post">
-                    {% csrf_token %}
-                    <div class="form-group">
-                        <label for="name">Full Name</label>
-                        <input type="text" id="name" name="name" required>
-                    </div>
-                    <div class="form-group">
-                        <label for="email">Email</label>
-                        <input type="email" id="email" name="email" required>
-                    </div>
-                    <div class="form-group">
-                        <label for="phone">Phone</label>
-                        <input type="tel" id="phone" name="phone">
-                    </div>
-                    <div class="form-group">
-                        <label for="address">Address</label>
-                        <textarea id="address" name="address" rows="3" required></textarea>
-                    </div>
-                    <button type="submit" class="btn">Place Order</button>
-                </form>
-            </div>
-            <div class="order-summary">
-                <h3>Order Summary</h3>
-                {% for item in items %}
-                <p>{{ item.product.name }} x {{ item.qty }} - ${{ item.subtotal }}</p>
-                {% endfor %}
-                <p class="total">Total: ${{ total }}</p>
-            </div>
-        </div>
-    </main>
-</body>
-</html>
+{% extends "store/base.html" %}
+
+{% block title %}Checkout{% endblock %}
+
+{% block content %}
+<h2>Checkout</h2>
+{% if items %}
+<table style="width: 100%; border-collapse: collapse;">
+    <thead>
+        <tr>
+            <th>Product</th>
+            <th>Quantity</th>
+            <th>Subtotal</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for item in items %}
+        <tr>
+            <td>{{ item.product.name }}</td>
+            <td>{{ item.qty }}</td>
+            <td>${{ item.subtotal }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+<p>Total: ${{ total }}</p>
+<form method="post">
+    {% csrf_token %}
+    <h3>Customer Information</h3>
+    <p><label>Name: <input type="text" name="name" required></label></p>
+    <p><label>Phone: <input type="text" name="phone"></label></p>
+    <p><label>Email: <input type="email" name="email"></label></p>
+    <p><label>Address: <textarea name="address"></textarea></label></p>
+    <p><label>Payment Method: 
+        <select name="payment_method">
+            <option value="CASH">Cash</option>
+            <option value="CREDIT">Credit</option>
+            <option value="ATM">ATM</option>
+            <option value="TRANSFER">Bank Transfer</option>
+            <option value="MOBILE">Mobile Payment</option>
+            <option value="OTHER">Other</option>
+        </select>
+    </label></p>
+    <button type="submit" class="btn">Place Order</button>
+</form>
+<a href="{% url 'store:cart' %}" class="btn">Back to Cart</a>
+{% else %}
+<p>No items to checkout.</p>
+{% endif %}
+{% endblock %}

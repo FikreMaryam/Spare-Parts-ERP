@@ -1,0 +1,54 @@
+{% extends 'base.html' %}
+
+{% block title %}Chat with {{ other_tenant.schema_name|title }}{% endblock %}
+
+{% block page_title %}Chat with {{ other_tenant.schema_name }}{% endblock %}
+
+{% block content %}
+<div class="header-actions">
+    <span class="badge badge-success">Live B2B Connection</span>
+</div>
+
+<div class="chat-container">
+    <!-- Chat Messages Area -->
+    <div class="chat-messages" id="chat-messages">
+        {% for msg in chat_messages %}
+            <div class="message-wrapper {% if msg.sender == current_tenant %}mine{% else %}theirs{% endif %}">
+                <div class="message-bubble">
+                    {{ msg.text }}
+                </div>
+                <div class="message-meta">
+                    {% if msg.sender != current_tenant %}{{ other_tenant.schema_name }} • {% endif %}{{ msg.timestamp|date:"g:i a" }}
+                </div>
+            </div>
+        {% empty %}
+            <div class="empty-state">
+                <div class="icon-wrapper bg-accent-light" style="margin: 0 auto 1.5rem;">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 21 1.9-5.7a8.5 8.5 0 1 1 3.8 3.8z"/></svg>
+                </div>
+                <h2>No messages yet</h2>
+                <p>Start a conversation with {{ other_tenant.schema_name }}!</p>
+            </div>
+        {% endfor %}
+    </div>
+
+    <!-- Message Input Area -->
+    <div class="chat-input-row">
+        <form method="post" action="{% url 'b2b:b2b_chat' b2b_connection.id %}">
+            {% csrf_token %}
+            <input type="text" name="message" placeholder="Type your message..." required autofocus autocomplete="off">
+            <button type="submit" class="btn">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width: 1.1rem; height: 1.1rem; margin-right: 0.5rem;"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></svg>
+                Send
+            </button>
+        </form>
+    </div>
+</div>
+
+<script>
+    const chatArea = document.getElementById('chat-messages');
+    if(chatArea) {
+        chatArea.scrollTop = chatArea.scrollHeight;
+    }
+</script>
+{% endblock %}

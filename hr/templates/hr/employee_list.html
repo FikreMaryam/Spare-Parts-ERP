@@ -1,33 +1,48 @@
 {% extends "base.html" %}
 
-{% block title %}Employees{% endblock %}
+{% block title %}Employees - Spare ERP{% endblock %}
+
+{% block page_title %}Employees{% endblock %}
 
 {% block content %}
-<h1>Employee List</h1>
-{% if employees %}
-<table class="card">
-    <thead>
-        <tr>
-            <th>Employee ID</th>
-            <th>Name</th>
-            <th>Role</th>
-            <th>Hire Date</th>
-            <th>Salary</th>
-        </tr>
-    </thead>
-    <tbody>
-        {% for emp in employees %}
-        <tr>
-            <td>{{ emp.employee_id }}</td>
-            <td>{{ emp.user.get_full_name|default:emp.user.username }}</td>
-            <td>{{ emp.get_role_display }}</td>
-            <td>{{ emp.hire_date }}</td>
-            <td>${{ emp.salary }}</td>
-        </tr>
-        {% endfor %}
-    </tbody>
-</table>
-{% else %}
-<p>No employees registered yet.</p>
-{% endif %}
+<div class="card table-card">
+    <div class="card-header">
+        <span class="text-muted fw-600">Manage your team and roles</span>
+    </div>
+    <div class="table-container">
+        {% if employees %}
+        <table class="sortable-table">
+            <thead>
+                <tr>
+                    <th class="pl-4">ID</th>
+                    <th>Name</th>
+                    <th>Role</th>
+                    <th>Hire Date</th>
+                    <th class="pr-4 text-right">Salary</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for emp in employees %}
+                <tr>
+                    <td class="pl-4 fw-700" style="font-family: monospace;">{{ emp.employee_id }}</td>
+                    <td class="fw-600">{{ emp.user.get_full_name|default:emp.user.username }}</td>
+                    <td>
+                        <span class="badge" style="background: hsla(var(--accent) / 0.15); color: hsl(var(--accent)); border: 1px solid hsla(var(--accent) / 0.3);">
+                            {{ emp.get_role_display }}
+                        </span>
+                    </td>
+                    <td class="text-muted">{{ emp.hire_date|date:"M d, Y" }}</td>
+                    <td class="pr-4 text-right fw-800" style="color: hsl(var(--success));">${{ emp.salary|floatformat:2 }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <div class="empty-state">
+            <p>No employees registered yet.</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
 {% endblock %}

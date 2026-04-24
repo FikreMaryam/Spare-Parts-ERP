@@ -1,14 +1,52 @@
 {% extends "base.html" %}
 
-{% block title %}Warehouses - ERP My Shop{% endblock %}
+{% block title %}Warehouses - Spare ERP{% endblock %}
+
+{% block page_title %}Warehouses{% endblock %}
 
 {% block content %}
-<h1>Warehouses</h1>
-<ul>
-    {% for w in warehouses %}
-    <li>{{ w.name }}{% if w.location %} ({{ w.location }}){% endif %}</li>
-    {% empty %}
-    <li>No warehouses defined.</li>
-    {% endfor %}
-</ul>
+<div style="display: flex; justify-content: flex-end; margin-bottom: 2rem;">
+    {% if request.user.is_superuser %}
+    <a href="{% url 'warehouse_create' %}" class="btn">Add New Warehouse</a>
+    {% endif %}
+</div>
+
+<div class="card" style="padding: 0; overflow: hidden;">
+    <div style="padding: 1.5rem 2rem; border-bottom: 1px solid hsl(var(--border)); background: hsla(var(--bg-hover) / 0.3);">
+        <span style="font-size: 0.9rem; color: hsl(var(--text-muted));">Manage your physical storage locations</span>
+    </div>
+    <table class="sortable-table">
+        <thead>
+            <tr>
+                <th style="padding-left: 2rem;">Name</th>
+                <th>Location</th>
+                <th>Description</th>
+                {% if request.user.is_superuser %}
+                <th style="text-align: right; padding-right: 2rem;">Actions</th>
+                {% endif %}
+            </tr>
+        </thead>
+        <tbody>
+            {% for w in warehouses %}
+            <tr>
+                <td style="padding-left: 2rem; font-weight: 600; color: hsl(var(--text));">{{ w.name }}</td>
+                <td>{{ w.location|default:"—" }}</td>
+                <td><span style="font-size: 0.9rem; color: hsl(var(--text-muted));">{{ w.description|truncatechars:100|default:"—" }}</span></td>
+                {% if request.user.is_superuser %}
+                <td style="text-align: right; padding-right: 2rem; white-space: nowrap;">
+                    <a href="{% url 'warehouse_update' w.pk %}" class="btn btn-secondary" style="padding: 0.4rem 0.8rem; font-size: 0.85rem;">Edit</a>
+                    <a href="{% url 'warehouse_delete' w.pk %}" class="btn btn-danger" style="padding: 0.4rem 0.8rem; font-size: 0.85rem; margin-left: 0.5rem;">Delete</a>
+                </td>
+                {% endif %}
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="4" style="text-align: center; padding: 4rem; color: hsl(var(--text-muted));">
+                    No warehouses defined. <a href="{% url 'warehouse_create' %}" style="color: hsl(var(--accent)); font-weight: 600;">Add one</a>.
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
 {% endblock %}

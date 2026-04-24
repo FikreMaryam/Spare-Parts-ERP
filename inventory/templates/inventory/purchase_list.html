@@ -1,66 +1,84 @@
 {% extends "base.html" %}
 
-{% block title %}Purchases (Bought Items) - ERP My Shop{% endblock %}
+{% block title %}Purchases - Spare ERP{% endblock %}
+
+{% block page_title %}Purchases (Bought Items){% endblock %}
 
 {% block content %}
-<h1>Purchases (Bought Items)</h1>
-
-<div class="card">
-    <form method="get" style="display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center;">
-        <label>From: <input type="date" name="date_from" value="{{ date_from }}"></label>
-        <label>To: <input type="date" name="date_to" value="{{ date_to }}"></label>
-        <label>Warehouse:
+<div class="card mb-4" style="padding: 1.5rem 2rem;">
+    <form method="get" class="flex-row gap-4 items-end" style="overflow-x: auto; padding-bottom: 0.5rem;">
+        <div class="form-group mb-0">
+            <label class="stat-label mb-2" style="font-size: 0.75rem;">From Date</label>
+            <input type="date" name="date_from" value="{{ date_from }}">
+        </div>
+        <div class="form-group mb-0">
+            <label class="stat-label mb-2" style="font-size: 0.75rem;">To Date</label>
+            <input type="date" name="date_to" value="{{ date_to }}">
+        </div>
+        <div class="form-group mb-0" style="min-width: 180px;">
+            <label class="stat-label mb-2" style="font-size: 0.75rem;">Warehouse</label>
             <select name="warehouse">
-                <option value="">All</option>
+                <option value="">All Warehouses</option>
                 {% for w in warehouses %}
                     <option value="{{ w.id }}" {% if filter_warehouse == w.id|stringformat:"s" %}selected{% endif %}>{{ w.name }}</option>
                 {% endfor %}
             </select>
-        </label>
-        <button type="submit" class="btn">Filter</button>
+        </div>
+        <div class="flex-row gap-3">
+            <button type="submit" class="btn btn-sm">Filter</button>
+            <a href="{% url 'purchase_add' %}" class="btn btn-sm">Add Purchase</a>
+        </div>
     </form>
-    <p style="margin-top: 1rem;">
-        <a href="{% url 'purchase_add' %}" class="btn">Add Purchase</a>
-    </p>
 </div>
 
-<div class="card">
-    <table>
-        <thead>
-            <tr>
-                <th>ID</th>
-                <th>Date</th>
-                <th>Supplier</th>
-                <th>Invoice #</th>
-                <th>Warehouse</th>
-            <th>Items</th>
-            <th>Total</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for purchase in purchases %}
-            <tr>
-                <td>{{ purchase.id }}</td>
-                <td>{{ purchase.date|date:"M d, Y H:i" }}</td>
-                <td>{{ purchase.warehouse.name|default:"—" }}</td>
-                <td>{{ purchase.supplier.name|default:"—" }}</td>
-                <td>{{ purchase.invoice_number|default:"—" }}</td>
-                <td>
-                    {% for item in purchase.items.all %}
-                    <a href="{% url 'product_detail' item.product.id %}">{{ item.product.name }}</a> x{{ item.quantity }} @ {{ item.unit_cost|floatformat:2 }}{% if not forloop.last %}; {% endif %}
-                    {% empty %}—{% endfor %}
-                </td>
-                <td>{{ purchase.total_amount|floatformat:2 }}</td>
-            </tr>
-            {% empty %}
-            <tr>
-                <td colspan="6">No purchases yet. <a href="{% url 'purchase_add' %}">Add a purchase</a>.</td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
-    {% if purchases %}
-    <p style="margin-top: 1rem;"><strong>Total (filtered): {{ total_bought|floatformat:2 }}</strong></p>
-    {% endif %}
+<div class="card table-card">
+    <div class="card-header">
+        <span class="text-muted fw-600">Total Bought (filtered): <strong style="color: hsl(var(--accent));">${{ total_bought|floatformat:2 }}</strong></span>
+    </div>
+    <div class="table-container">
+        <table class="sortable-table">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Date</th>
+                    <th>Supplier</th>
+                    <th>Invoice #</th>
+                    <th>Warehouse</th>
+                    <th>Items</th>
+                    <th class="actions-col">Total</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for purchase in purchases %}
+                <tr>
+                    <td class="fw-700">#{{ purchase.id }}</td>
+                    <td>
+                        <div class="fw-600">{{ purchase.date|date:"M d, Y" }}</div>
+                        <div class="text-muted text-sm">{{ purchase.date|date:"H:i" }}</div>
+                    </td>
+                    <td>{{ purchase.supplier.name|default:"—" }}</td>
+                    <td><span class="fw-600" style="font-family: monospace;">{{ purchase.invoice_number|default:"—" }}</span></td>
+                    <td class="text-muted">{{ purchase.warehouse.name|default:"—" }}</td>
+                    <td style="max-width: 300px;">
+                        {% for item in purchase.items.all %}
+                        <div class="flex-row justify-between mb-2">
+                            <a href="{% url 'product_detail' item.product.id %}" class="fw-600 text-sm">{{ item.product.name }}</a>
+                            <span class="text-muted text-sm">x{{ item.quantity }} @ ${{ item.unit_cost|floatformat:2 }}</span>
+                        </div>
+                        {% empty %}—{% endfor %}
+                    </td>
+                    <td class="actions-col fw-800" style="color: hsl(var(--accent)); font-size: 1.1rem;">${{ purchase.total_amount|floatformat:2 }}</td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="7" class="empty-state">
+                        <p>No purchases match your criteria.</p>
+                        <a href="{% url 'purchase_add' %}" class="btn mt-4">Add your first purchase</a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
 </div>
 {% endblock %}

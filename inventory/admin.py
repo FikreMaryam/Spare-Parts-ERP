@@ -9,8 +9,6 @@ from .models import (
     CarModel,
     Warehouse,
     StockMovement,
-    Account,
-    JournalEntry,
 )
 from django.utils.safestring import mark_safe
 
@@ -49,16 +47,6 @@ class StockMovementAdmin(admin.ModelAdmin):
     search_fields = ("product__name", "reference")
 
 
-@admin.register(Account)
-class AccountAdmin(admin.ModelAdmin):
-    list_display = ("code", "name", "parent")
-    search_fields = ("code", "name")
-
-
-@admin.register(JournalEntry)
-class JournalEntryAdmin(admin.ModelAdmin):
-    list_display = ("date", "description", "amount", "debit_account", "credit_account")
-    search_fields = ("description",)
 
 
 @admin.register(CarModel)

@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+
+{% block title %}Confirm Delete - Spare ERP{% endblock %}
+
+{% block page_title %}Confirm Delete{% endblock %}
+
+{% block content %}
+<div class="card" style="max-width: 600px; margin: 4rem auto; padding: 3.5rem; text-align: center; border: 1px solid hsla(var(--error) / 0.3); box-shadow: 0 20px 40px hsla(var(--error) / 0.1);">
+    <div style="width: 80px; height: 80px; background: hsla(var(--error) / 0.1); color: hsl(var(--error)); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 2rem;">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width: 40px; height: 40px;"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg>
+    </div>
+    
+    <h2 style="margin-bottom: 1rem; color: hsl(var(--text));">Are you absolutely sure?</h2>
+    <p style="color: hsl(var(--text-muted)); margin-bottom: 2.5rem; line-height: 1.6;">
+        You are about to delete <strong style="color: hsl(var(--text));">{{ object }}</strong>.<br> This action is permanent and cannot be undone.
+    </p>
+    
+    <form method="post" style="display: flex; gap: 1rem; justify-content: center;">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-danger" style="flex: 1; padding: 0.85rem 1.5rem;">Yes, Delete Permanently</button>
+        <a href="javascript:history.back()" class="btn btn-secondary" style="flex: 1; padding: 0.85rem 1.5rem; text-align: center;">Cancel</a>
+    </form>
+</div>
+{% endblock %}

@@ -14,7 +14,6 @@ urlpatterns = [
     path("sales/", include("sales.urls")),
     path("inventory/", include("inventory.urls")),
     path("hr/", include("hr.urls")),
-    path("store/", include("store.urls")),
 ]
 
 

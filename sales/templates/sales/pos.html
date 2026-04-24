@@ -1,68 +1,56 @@
 {% extends "base.html" %}
 
-{% block title %}Point of Sale - ERP My Shop{% endblock %}
+{% block title %}Point of Sale - Spare ERP{% endblock %}
 
-{% block extra_css %}
-<style>
-.product-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill,minmax(220px,1fr));
-    gap: 1rem;
-}
-.product-card {
-    background: var(--bg-card);
-    border: 1px solid var(--border);
-    border-radius: 12px;
-    padding: 1rem;
-    display: flex;
-    flex-direction: column;
-    justify-content: space-between;
-    transition: transform 0.2s, box-shadow 0.2s;
-}
-.product-card:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 8px rgba(0,0,0,0.3);
-}
-.product-card h3 { margin: 0 0 0.5rem; font-size: 1.1rem; }
-.product-card p { margin: 0.25rem 0; font-size: 0.9rem; color: var(--text-muted); }
-</style>
-{% endblock %}
+{% block page_title %}Point of Sale{% endblock %}
 
 {% block content %}
-<h1>Point of Sale</h1>
-<p><a href="{% url 'cart' %}" class="btn btn-secondary">Cart ({{ cart_count|default:0 }})</a></p>
-<!-- floating popup trigger -->
-<div id="cart-popup-trigger" class="btn btn-secondary" title="View Cart" style="position:fixed;bottom:20px;right:20px;cursor:pointer;z-index:1000;">
-    🛒 ({{ cart_count|default:0 }})
+<div id="cart-popup-trigger" class="btn cart-trigger" title="View Cart">
+    🛒 <span class="cart-count-badge">{{ cart_count|default:0 }}</span>
 </div>
-<div id="cart-popup" style="display:none;position:fixed;bottom:60px;right:20px;width:300px;background:var(--bg-card);border:1px solid var(--border);border-radius:8px;padding:1rem;z-index:1001;">
-    <h4>Cart</h4>
+
+<div id="cart-popup" class="cart-popup">
+    <h3 class="mb-4">Your Cart</h3>
     {% if cart_items %}
-    <ul style="list-style:none;padding:0;margin:0;">
-        {% for p,qty,override in cart_items %}
-        <li>{{ p.name }} × {{ qty }}{% if override %} @ {{ override }}{% endif %}</li>
+    <div style="max-height: 400px; overflow-y: auto; margin-bottom: 1.5rem;">
+        {% for item in cart_items %}
+        <div class="cart-item">
+            <div class="cart-item-info">
+                <span class="cart-item-name">{{ item.product.name }}</span>
+                <span class="cart-item-qty">Qty: {{ item.quantity }}</span>
+            </div>
+            <div class="cart-item-price">${{ item.get_total|floatformat:2 }}</div>
+        </div>
         {% endfor %}
-    </ul>
-    <p style="margin-top:0.5rem;text-align:center;"><a href="{% url 'cart' %}" class="btn">Go to Cart</a></p>
+    </div>
+    <a href="{% url 'cart' %}" class="btn" style="width: 100%;">Checkout Now</a>
     {% else %}
-    <p>Cart is empty</p>
+    <div class="empty-state" style="padding: 2rem 0;">
+        <p>Your cart is empty</p>
+    </div>
     {% endif %}
 </div>
-<form method="get" style="margin-bottom:1rem;">
-    <input type="text" name="q" placeholder="Search part, OEM, brand, car model..." value="{{ request.GET.q }}" style="width:300px; padding:0.4rem;">
-    <label style="margin-left:1rem;">
-        Price type:
-        <select name="price_type">
-            <option value="retail" {% if request.GET.price_type != 'wholesale' %}selected{% endif %}>Retail</option>
-            <option value="wholesale" {% if request.GET.price_type == 'wholesale' %}selected{% endif %}>Wholesale</option>
-        </select>
-    </label>
-    <button type="submit" class="btn" style="margin-left:0.5rem;">Search</button>
-</form>
+
+<div class="card">
+    <form method="get" class="pos-search-bar">
+        <div class="form-group" style="flex: 1; min-width: 300px; margin-bottom: 0;">
+            <label>Product Search</label>
+            <input type="text" name="q" placeholder="Search by part #, oem, brand, car model..." value="{{ request.GET.q }}">
+        </div>
+        <div class="form-group" style="min-width: 150px; margin-bottom: 0;">
+            <label>Pricing Model</label>
+            <select name="price_type">
+                <option value="retail" {% if request.GET.price_type != 'wholesale' %}selected{% endif %}>Retail</option>
+                <option value="wholesale" {% if request.GET.price_type == 'wholesale' %}selected{% endif %}>Wholesale</option>
+            </select>
+        </div>
+        <button type="submit" class="btn">Search</button>
+    </form>
+</div>
 
 {% if errors %}
-<div class="card errors">
-    <ul>
+<div class="card badge-error" style="border-radius: var(--radius-md); padding: 1rem 2rem;">
+    <ul style="margin: 0; padding-left: 1.2rem;">
         {% for error in errors %}
         <li>{{ error }}</li>
         {% endfor %}
@@ -73,38 +61,49 @@
 <div class="card">
     <form method="post" id="sale-form">
         {% csrf_token %}
-        <!-- step guidance -->
-        <p>Select a product from the list to open the sale form.</p>
+        <p class="text-muted mb-4">Select a product to begin a sale or add it to your cart.</p>
+        
         <div class="product-grid">
-    {% for p in products %}
-    <div class="product-card">
-        <h3>{{ p.name }}</h3>
-        <p>Part #: {{ p.part_number|default:'—' }}</p>
-        <p>Brand: {{ p.brand|default:'—' }}</p>
-        <p>Stock: {{ p.quantity }}</p>
-        <div style="margin-top:0.5rem; display:flex; gap:0.5rem;">
-            <a href="{% url 'pos_single' p.id %}" class="btn">Sell</a>
-            <a href="{% url 'add_to_cart' p.id %}" class="btn-secondary btn">Add to Cart</a>
+            {% for p in products %}
+            <div class="product-card">
+                <div>
+                    <h3>{{ p.name }}</h3>
+                    <p>Part #: <span>{{ p.part_number|default:'—' }}</span></p>
+                    <p>Brand: <span>{{ p.brand|default:'—' }}</span></p>
+                    <p>In Stock: <span>{{ p.quantity }}</span></p>
+                </div>
+                <div style="margin-top: 1.5rem; display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem;">
+                    <a href="{% url 'pos_single' p.id %}" class="btn">Sell Now</a>
+                    <a href="{% url 'add_to_cart' p.id %}" class="btn btn-secondary">Add Cart</a>
+                </div>
+            </div>
+            {% empty %}
+            <div class="empty-state" style="grid-column: 1 / -1;">
+                <p>No products match your search. Try broadening your criteria.</p>
+            </div>
+            {% endfor %}
         </div>
-    </div>
-    {% empty %}
-    <p>No products available. Add products via Admin.</p>
-    {% endfor %}
-</div>
-        <p style="margin-top: 1rem;">
-            <label>Price type:
-                <select id="price-type-select" name="price_type" form="sale-form">
+
+        <div style="margin-top: 3rem; padding-top: 2rem; border-top: 1px solid hsl(var(--border)); display: flex; align-items: center; justify-content: space-between;">
+            <div style="display: flex; align-items: center; gap: 1rem;">
+                <label style="margin: 0;">Active Pricing:</label>
+                <select id="price-type-select" name="price_type" form="sale-form" style="width: auto;">
                     <option value="retail" {% if request.GET.price_type != 'wholesale' %}selected{% endif %}>Retail</option>
                     <option value="wholesale" {% if request.GET.price_type == 'wholesale' %}selected{% endif %}>Wholesale</option>
                 </select>
-            </label>
-            <strong style="margin-left:1rem;">Grand Total: <span id="grand-total">0.00</span></strong>
-            &nbsp;&nbsp;<strong>Estimated Profit: <span id="grand-profit">0.00</span></strong>
-        </p>
-        <!-- customer/payment section moved below product table -->
-        <hr>
+            </div>
+            <div style="text-align: right;">
+                <div style="font-size: 0.9rem; color: hsl(var(--text-muted));">Estimated totals for this session</div>
+                <div style="font-size: 1.5rem; margin-top: 0.5rem;">
+                    <span class="fw-800">Total: <span id="grand-total" style="color: hsl(var(--accent));">$0.00</span></span>
+                    &nbsp;&nbsp;
+                    <span class="fw-700" style="font-size: 1.1rem; opacity: 0.8;">Profit: <span id="grand-profit" style="color: hsl(var(--success));">$0.00</span></span>
+                </div>
+            </div>
+        </div>
     </form>
 </div>
+
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     var trigger = document.getElementById('cart-popup-trigger');
@@ -112,7 +111,7 @@ document.addEventListener('DOMContentLoaded', function() {
     if (trigger && popup) {
         trigger.addEventListener('click', function(e) {
             e.stopPropagation();
-            popup.style.display = popup.style.display === 'block' ? 'none' : 'block';
+            popup.style.display = (popup.style.display === 'block') ? 'none' : 'block';
         });
         document.addEventListener('click', function(e) {
             if (!popup.contains(e.target) && e.target !== trigger) {

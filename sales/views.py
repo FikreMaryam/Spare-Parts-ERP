@@ -7,11 +7,12 @@ from reportlab.pdfgen import canvas
 from expenses.models import Expense
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.decorators import permission_required
+from django.contrib import messages
 
 
 
 from inventory.models import Product
-from .models import Sale, SaleItem, Customer
+from .models import Cart, Sale, SaleItem, Customer
 
 @login_required
 @permission_required('sales.add_sale', raise_exception=True)
@@ -19,46 +20,14 @@ def create_sale(request):
     ...
 
 
-@login_required
-def full_business_report(request):
-    sales = Sale.objects.all()
-    expenses = Expense.objects.all()
-
-    total_revenue = sum(s.total_amount for s in sales)
-    total_profit = sum(s.profit() for s in sales)
-    total_expenses = sum(e.amount for e in expenses)
-
-    net_profit = total_profit - total_expenses
-
-    return render(
-        request,
-        "sales/full_report.html",
-        {
-            "total_revenue": total_revenue,
-            "total_profit": total_profit,
-            "total_expenses": total_expenses,
-            "net_profit": net_profit,
-        }
-    )
 
 
 @login_required
 def pos_view(request):
     # list products only; pricing and sale handled on separate page or via cart
     products = Product.objects.all()
-    cart = request.session.get("cart", {})
-    cart_prices = request.session.get("cart_prices", {})
-    cart_count = sum(cart.values())
-
-    # build cart items for preview
-    cart_items = []
-    for pid, qty in cart.items():
-        try:
-            prod = Product.objects.get(id=pid)
-            override = cart_prices.get(str(pid))
-            cart_items.append((prod, qty, override))
-        except Product.DoesNotExist:
-            pass
+    cart_items = Cart.objects.filter(user=request.user).select_related('product')
+    cart_count = sum(item.quantity for item in cart_items)
 
     q = request.GET.get("q", "").strip()
     if q:
@@ -76,17 +45,17 @@ def pos_view(request):
 @login_required
 def add_to_cart(request, product_id):
     """Add one unit of the given product to the session cart and redirect to cart."""
-    cart = request.session.get("cart", {})
-    cart[str(product_id)] = cart.get(str(product_id), 0) + 1
-    request.session["cart"] = cart
+    product = get_object_or_404(Product, id=product_id)
+    cart_item, created = Cart.objects.get_or_create(user=request.user, product=product, defaults={'quantity': 1})
+    if not created:
+        cart_item.quantity += 1
+        cart_item.save()
     return redirect("cart")
 
 
 @login_required
 def remove_from_cart(request, product_id):
-    cart = request.session.get("cart", {})
-    cart.pop(str(product_id), None)
-    request.session["cart"] = cart
+    Cart.objects.filter(user=request.user, product_id=product_id).delete()
     return redirect("cart")
 
 
@@ -95,49 +64,52 @@ def cart_view(request):
     """Display cart contents and handle checkout for multiple items."""
     from .models import Sale, SaleItem, Customer
 
-    cart = request.session.get("cart", {})
-    prices = request.session.get("cart_prices", {})
+    cart_items = Cart.objects.filter(user=request.user).select_related('product')
     products = []
-    for pid, qty in list(cart.items()):
-        try:
-            prod = Product.objects.get(id=pid)
-            override = prices.get(str(pid))
-            products.append((prod, qty, override))
-        except Product.DoesNotExist:
-            cart.pop(pid, None)
-    request.session["cart"] = cart
+    for item in cart_items:
+        prod = item.product
+        qty = item.quantity
+        override = item.price_override
+        products.append((prod, qty, override))
 
     errors = []
     if request.method == "POST":
-        # update quantities from form
-        new_cart = {}
-        for prod, oldqty, override in products:
-            raw = request.POST.get(f"qty_{prod.id}", "0") or "0"
+        # update quantities and prices from form
+        for item in cart_items:
+            prod = item.product
+            raw_qty = request.POST.get(f"qty_{prod.id}", "0") or "0"
             try:
-                q = int(raw)
+                q = int(raw_qty)
             except (ValueError, TypeError):
                 q = 0
+            raw_price = request.POST.get(f"price_{prod.id}", "").strip()
+            price_override = None
+            if raw_price:
+                try:
+                    price_override = float(raw_price)
+                except ValueError:
+                    price_override = None
             if q > 0:
                 if q > prod.quantity:
                     errors.append(f"Insufficient stock for {prod.name}: requested {q}, only {prod.quantity} available.")
                 else:
-                    new_cart[str(prod.id)] = q
-        cart = new_cart
-        request.session["cart"] = cart
+                    item.quantity = q
+                    item.price_override = price_override
+                    item.save()
+            else:
+                item.delete()
 
         if errors:
             customers = Customer.objects.all()
-            prices = request.session.get("cart_prices", {})
-            return render(request, "sales/cart.html", {"products": products, "errors": errors, "customers": customers, "Sale": Sale, "prices": prices})
+            return render(request, "sales/cart.html", {"products": products, "errors": errors, "customers": customers, "Sale": Sale})
 
         # no items
-        if not cart:
+        if not Cart.objects.filter(user=request.user).exists():
             errors.append("No items in cart.")
             customers = Customer.objects.all()
-            prices = request.session.get("cart_prices", {})
-            return render(request, "sales/cart.html", {"products": products, "errors": errors, "customers": customers, "Sale": Sale, "prices": prices})
+            return render(request, "sales/cart.html", {"products": products, "errors": errors, "customers": customers, "Sale": Sale})
 
-        # handle customer and payment similar to pos_single
+        # handle customer and payment
         customer_type = request.POST.get('customer_type', 'existing')
         customer_name = request.POST.get('customer_name', '').strip()
         new_name = request.POST.get('new_name', '').strip()
@@ -154,19 +126,18 @@ def cart_view(request):
         with transaction.atomic():
             sale = Sale.objects.create(payment_method=payment, customer=cust)
             total = 0
-            for prod, qty, override in products:
-                if str(prod.id) not in cart:
-                    continue
-                qty = cart[str(prod.id)]
-                # determine unit price: POST > session override > default
+            for item in Cart.objects.filter(user=request.user).select_related('product'):
+                prod = item.product
+                qty = item.quantity
+                # determine unit price: POST > override > default
                 price_override = request.POST.get(f"price_{prod.id}", "").strip()
                 if price_override:
                     try:
                         unit_price = float(price_override)
                     except ValueError:
-                        unit_price = 0
-                elif override is not None:
-                    unit_price = override
+                        unit_price = item.price_override or prod.selling_price
+                elif item.price_override:
+                    unit_price = item.price_override
                 else:
                     unit_price = prod.selling_price
 
@@ -182,14 +153,12 @@ def cart_view(request):
             sale.total_amount = total
             sale.save()
             sale.award_loyalty_points()
-        # clear cart and prices
-        request.session["cart"] = {}
-        request.session["cart_prices"] = {}
+        # clear cart
+        Cart.objects.filter(user=request.user).delete()
         return redirect("invoice", sale.id)
 
     customers = Customer.objects.all()
-    prices = request.session.get("cart_prices", {})
-    return render(request, "sales/cart.html", {"products": products, "errors": errors, "customers": customers, "Sale": Sale, "prices": prices})
+    return render(request, "sales/cart.html", {"products": products, "errors": errors, "customers": customers, "Sale": Sale})
 
 
 @login_required
@@ -219,14 +188,11 @@ def pos_single(request, product_id):
                 unit_price = product.selling_price
 
         if not errors:
-            cart = request.session.get('cart', {})
-            cart[str(product.id)] = qty
-            request.session['cart'] = cart
-            # store override price
-            prices = request.session.get('cart_prices', {})
-            if price_override:
-                prices[str(product.id)] = unit_price
-            request.session['cart_prices'] = prices
+            cart_item, created = Cart.objects.get_or_create(user=request.user, product=product, defaults={'quantity': qty, 'price_override': unit_price if price_override else None})
+            if not created:
+                cart_item.quantity = qty
+                cart_item.price_override = unit_price if price_override else None
+                cart_item.save()
             return redirect('cart')
 
     return render(
@@ -261,6 +227,71 @@ def customer_detail(request, pk):
 def invoice_view(request, sale_id):
     sale = get_object_or_404(Sale, id=sale_id)
     return render(request, "sales/invoice.html", {"sale": sale})
+
+
+@login_required
+def pending_orders(request):
+    from django.core.mail import send_mail
+    from django.conf import settings
+    
+    if request.method == 'POST':
+        sale_id = request.POST.get('sale_id')
+        action = request.POST.get('action')
+        sale = get_object_or_404(Sale, id=sale_id, status='PENDING')
+        
+        if action == 'approve':
+            # Check stock availability
+            insufficient_stock = []
+            for item in sale.items.all():
+                if item.quantity > item.product.quantity:
+                    insufficient_stock.append(f"{item.product.name}: requested {item.quantity}, available {item.product.quantity}")
+            
+            if insufficient_stock:
+                messages.error(request, f"Cannot approve order: {'; '.join(insufficient_stock)}")
+                return redirect('pending_orders')
+            
+            # Deduct inventory
+            with transaction.atomic():
+                for item in sale.items.all():
+                    item.product.quantity -= item.quantity
+                    item.product.save()
+                sale.status = 'APPROVED'
+                sale.save()
+                
+                # Send email to customer
+                if sale.customer and sale.customer.email:
+                    subject = f"Order #{sale.id} Approved - ERP My Shop"
+                    message = f"""
+Dear {sale.customer.name},
+
+Your order #{sale.id} has been approved and is now being processed.
+
+Order Details:
+- Total Amount: ${sale.total_amount:.2f}
+- Payment Method: {sale.payment_method}
+
+Estimated arrival time: 3-5 business days.
+
+Thank you for shopping with us!
+
+ERP My Shop
+"""
+                    try:
+                        send_mail(subject, message, settings.DEFAULT_FROM_EMAIL, [sale.customer.email])
+                    except Exception as e:
+                        messages.warning(request, f"Order approved but email failed to send: {e}")
+                
+                messages.success(request, f"Order #{sale.id} approved and inventory updated.")
+        
+        elif action == 'cancel':
+            sale.status = 'CANCELLED'
+            sale.save()
+            messages.success(request, f"Order #{sale.id} cancelled.")
+        
+        return redirect('pending_orders')
+    
+    pending_sales = Sale.objects.filter(status='PENDING').prefetch_related('items__product', 'customer').order_by('-date')
+    return render(request, 'sales/pending_orders.html', {'pending_sales': pending_sales})
 
 
 @login_required

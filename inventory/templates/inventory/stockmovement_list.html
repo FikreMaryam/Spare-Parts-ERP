@@ -1,51 +1,105 @@
 {% extends "base.html" %}
 
-{% block title %}Stock Movements - ERP My Shop{% endblock %}
+{% block title %}Stock Movements - Spare ERP{% endblock %}
+
+{% block page_title %}Stock Movements{% endblock %}
 
 {% block content %}
-<h1>Stock Movements</h1>
-<form method="get" class="card">
-    <input type="text" name="q" value="{{ search }}" placeholder="Search product / ref">
-    <select name="type">
-        <option value="">All types</option>
-        <option value="purchase" {% if filter_type == 'purchase' %}selected{% endif %}>Purchase</option>
-        <option value="sale" {% if filter_type == 'sale' %}selected{% endif %}>Sale</option>
-        <option value="adjustment" {% if filter_type == 'adjustment' %}selected{% endif %}>Adjustment</option>
-        <option value="transfer" {% if filter_type == 'transfer' %}selected{% endif %}>Transfer</option>
-    </select>
-    <button class="btn" type="submit">Filter</button>
-</form>
-<table class="card">
-    <thead>
-        <tr>
-            <th>Date</th>
-            <th>Product</th>
-            <th>Qty</th>
-            <th>Type</th>
-            <th>Warehouse</th>
-            <th>Reference</th>
-        </tr>
-    </thead>
-    <tbody>
-        {% for m in page.object_list %}
-        <tr>
-            <td>{{ m.timestamp }}</td>
-            <td><a href="{% url 'product_detail' m.product.id %}">{{ m.product.name }}</a></td>
-            <td>{{ m.quantity }}</td>
-            <td>{{ m.get_movement_type_display }}</td>
-            <td>{% if m.warehouse %}<a href="{% url 'warehouse_list' %}#">{{ m.warehouse.name }}</a>{% else %}—{% endif %}</td>
-            <td>{{ m.reference }}</td>
-        </tr>
-        {% empty %}
-        <tr><td colspan="6">No movements.</td></tr>
-        {% endfor %}
-    </tbody>
-</table>
+<div class="card" style="margin-bottom: 2rem; padding: 1.5rem 2rem;">
+    <form method="get" style="display: flex; gap: 1.5rem; flex-wrap: wrap; align-items: flex-end;">
+        <div class="form-group" style="flex: 1; min-width: 250px;">
+            <label style="display: block; margin-bottom: 0.4rem; font-size: 0.85rem; font-weight: 600; color: hsl(var(--text-muted));">Search</label>
+            <input type="text" name="q" value="{{ search }}" placeholder="Search product or reference..." style="width: 100%;">
+        </div>
+        <div class="form-group" style="min-width: 180px;">
+            <label style="display: block; margin-bottom: 0.4rem; font-size: 0.85rem; font-weight: 600; color: hsl(var(--text-muted));">Movement Type</label>
+            <select name="type" style="width: 100%;">
+                <option value="">All Types</option>
+                <option value="purchase" {% if filter_type == 'purchase' %}selected{% endif %}>Purchase</option>
+                <option value="sale" {% if filter_type == 'sale' %}selected{% endif %}>Sale</option>
+                <option value="adjustment" {% if filter_type == 'adjustment' %}selected{% endif %}>Adjustment</option>
+                <option value="transfer" {% if filter_type == 'transfer' %}selected{% endif %}>Transfer</option>
+            </select>
+        </div>
+        <button class="btn" type="submit" style="padding: 0.75rem 2rem;">Filter Results</button>
+    </form>
+</div>
+
+<div class="card" style="padding: 0; overflow: hidden;">
+    <div style="padding: 1.5rem 2rem; border-bottom: 1px solid hsl(var(--border)); background: hsla(var(--bg-hover) / 0.3);">
+        <span style="font-size: 0.9rem; color: hsl(var(--text-muted));">Showing sequence of inventory changes</span>
+    </div>
+    <table class="sortable-table">
+        <thead>
+            <tr>
+                <th style="padding-left: 2rem;">Timestamp</th>
+                <th>Product</th>
+                <th>Quantity</th>
+                <th>Type</th>
+                <th>Warehouse</th>
+                <th style="padding-right: 2rem;">Reference</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for m in page.object_list %}
+            <tr>
+                <td style="padding-left: 2rem;">
+                    {{ m.timestamp|date:"M d, Y" }} <br>
+                    <small style="color: hsl(var(--text-muted));">{{ m.timestamp|date:"H:i:s" }}</small>
+                </td>
+                <td>
+                    <a href="{% url 'product_detail' m.product.id %}" style="font-weight: 600; color: hsl(var(--text));">{{ m.product.name }}</a>
+                </td>
+                <td style="font-weight: 700; color: {% if m.quantity > 0 %}hsl(var(--success)){% else %}hsl(var(--error)){% endif %};">
+                    {% if m.quantity > 0 %}+{% endif %}{{ m.quantity }}
+                </td>
+                <td>
+                    <span style="background: hsla(var(--bg-hover) / 0.7); padding: 0.25rem 0.6rem; border-radius: 6px; font-size: 0.8rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.02em;">
+                        {{ m.get_movement_type_display }}
+                    </span>
+                </td>
+                <td>
+                    {% if m.warehouse %}
+                        <span style="color: hsl(var(--text)); font-weight: 500;">{{ m.warehouse.name }}</span>
+                    {% else %}
+                        <span style="color: hsl(var(--text-muted));">—</span>
+                    {% endif %}
+                </td>
+                <td style="padding-right: 2rem; font-family: monospace; font-size: 0.9rem;">{{ m.reference|default:"—" }}</td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="6" style="text-align: center; padding: 4rem; color: hsl(var(--text-muted));">
+                    No stock movements found matching your criteria.
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
 {% if page.has_other_pages %}
-<div class="pagination">
-    {% if page.has_previous %}<a href="?page={{ page.previous_page_number }}" class="btn btn-secondary">← Prev</a>{% endif %}
-    <span class="page-info">Page {{ page.number }} of {{ page.paginator.num_pages }}</span>
-    {% if page.has_next %}<a href="?page={{ page.next_page_number }}" class="btn btn-secondary">Next →</a>{% endif %}
+<div class="pagination" style="margin-top: 2rem; display: flex; justify-content: center; align-items: center; gap: 1.5rem;">
+    {% if page.has_previous %}
+        <a href="?page={{ page.previous_page_number }}{% if search %}&q={{ search }}{% endif %}{% if filter_type %}&type={{ filter_type }}{% endif %}" class="btn btn-secondary">← Previous Page</a>
+    {% endif %}
+    
+    <span style="font-weight: 600; color: hsl(var(--text-muted));">Page <span style="color: hsl(var(--text));">{{ page.number }}</span> of {{ page.paginator.num_pages }}</span>
+    
+    {% if page.has_next %}
+        <a href="?page={{ page.next_page_number }}{% if search %}&q={{ search }}{% endif %}{% if filter_type %}&type={{ filter_type }}{% endif %}" class="btn btn-secondary">Next Page →</a>
+    {% endif %}
 </div>
 {% endif %}
+
+<style>
+    input[type="text"], select {
+        padding: 0.75rem 1rem;
+        background: hsl(var(--bg));
+        border: 1px solid hsl(var(--border));
+        border-radius: 8px;
+        color: hsl(var(--text));
+        font-size: 0.95rem;
+    }
+</style>
 {% endblock %}

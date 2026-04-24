@@ -121,39 +121,6 @@ class StockMovement(models.Model):
         return f"{self.get_movement_type_display()} {self.quantity} x {self.product.name}"
 
 
-class Account(models.Model):
-    name = models.CharField(max_length=100)
-    code = models.CharField(max_length=20, blank=True)
-    parent = models.ForeignKey(
-        "self",
-        null=True,
-        blank=True,
-        on_delete=models.CASCADE,
-        related_name="children",
-    )
-
-    class Meta:
-        verbose_name_plural = "accounts"
-
-    def __str__(self):
-        if self.code:
-            return f"{self.code} - {self.name}"
-        return self.name
-
-
-class JournalEntry(models.Model):
-    date = models.DateField()
-    description = models.TextField(blank=True)
-    debit_account = models.ForeignKey(
-        Account, related_name="debits", on_delete=models.CASCADE
-    )
-    credit_account = models.ForeignKey(
-        Account, related_name="credits", on_delete=models.CASCADE
-    )
-    amount = models.DecimalField(max_digits=12, decimal_places=2)
-
-    def __str__(self):
-        return f"{self.date} {self.amount}: {self.description[:30]}"
 
 
 class CarModel(models.Model):

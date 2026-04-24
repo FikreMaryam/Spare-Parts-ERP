@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+
+{% block title %}
+{% if object %}Edit {{ object|truncatechars:30 }}{% else %}Add New{% endif %} - Spare ERP
+{% endblock %}
+
+{% block page_title %}{% if object %}Edit {{ object|truncatechars:30 }}{% else %}Add New{% endif %}{% endblock %}
+
+{% block content %}
+<div class="card" style="max-width: 800px; margin: 0 auto; padding: 2.5rem;">
+    <form method="post" enctype="multipart/form-data">
+        {% csrf_token %}
+        
+        {% if form.non_field_errors %}
+            <div style="background: hsla(var(--error) / 0.1); border: 1px solid hsl(var(--error)); color: hsl(var(--error)); padding: 1rem; border-radius: 8px; margin-bottom: 2rem; font-size: 0.9rem;">
+                {{ form.non_field_errors }}
+            </div>
+        {% endif %}
+        
+        <div style="display: grid; gap: 1.5rem;">
+            {% for field in form %}
+                <div class="form-group">
+                    <label for="{{ field.id_for_label }}" style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: hsl(var(--text));">
+                        {{ field.label }}
+                    </label>
+                    <div class="input-wrapper">
+                        {{ field }}
+                    </div>
+                    {% if field.help_text %}
+                        <p style="margin-top: 0.4rem; font-size: 0.8rem; color: hsl(var(--text-muted));">
+                            {{ field.help_text }}
+                        </p>
+                    {% endif %}
+                    {% if field.errors %}
+                        <p style="margin-top: 0.4rem; font-size: 0.8rem; color: hsl(var(--error)); font-weight: 500;">
+                            {{ field.errors|striptags }}
+                        </p>
+                    {% endif %}
+                </div>
+            {% endfor %}
+        </div>
+
+        <div style="margin-top: 2.5rem; display: flex; gap: 1rem;">
+            <button type="submit" class="btn" style="flex: 1;">Save Changes</button>
+            <a href="javascript:history.back()" class="btn btn-secondary" style="flex: 1; text-align: center;">Cancel</a>
+        </div>
+    </form>
+</div>
+
+<style>
+    /* Styling for dynamic form inputs */
+    input[type="text"], input[type="number"], input[type="email"], input[type="password"], input[type="date"], select, textarea {
+        width: 100%;
+        padding: 0.75rem 1rem;
+        background: hsl(var(--bg));
+        border: 1px solid hsl(var(--border));
+        border-radius: var(--radius-md);
+        color: hsl(var(--text));
+        font-size: 0.95rem;
+        transition: all 0.2s;
+    }
+    input:focus, select:focus, textarea:focus {
+        outline: none;
+        border-color: hsl(var(--accent));
+        box-shadow: 0 0 0 3px hsla(var(--accent) / 0.1);
+    }
+    input[type="checkbox"] {
+        width: 1.25rem;
+        height: 1.25rem;
+        accent-color: hsl(var(--accent));
+    }
+</style>
+{% endblock %}

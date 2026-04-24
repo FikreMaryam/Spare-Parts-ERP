@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+
+{% block title %}B2B Network - Spare ERP{% endblock %}
+
+{% block page_title %}B2B Network{% endblock %}
+
+{% block content %}
+<div class="dashboard-grid" style="grid-template-columns: 1.5fr 1fr;">
+    <!-- LEFT COLUMN: Active Connections & Requests -->
+    <div class="flex-col gap-4">
+        <!-- Active Connections -->
+        <div class="card table-card">
+            <div class="card-header">
+                <h2 class="m-0">My Connections</h2>
+            </div>
+            <div style="padding: 0 2rem;">
+                {% if active_connections %}
+                    <ul class="connection-list">
+                    {% for conn in active_connections %}
+                        <li class="connection-item">
+                            <div class="connection-info">
+                                <strong>{{ current_tenant.schema_name }}</strong> <b>↔</b> 
+                                <span>
+                                    {% if conn.requester == current_tenant %}
+                                        {{ conn.receiver.schema_name }}
+                                    {% else %}
+                                        {{ conn.requester.schema_name }}
+                                    {% endif %}
+                                </span>
+                            </div>
+                            <a href="{% url 'b2b:b2b_chat' conn.id %}" class="btn btn-sm">Open Chat</a>
+                        </li>
+                    {% endfor %}
+                    </ul>
+                {% else %}
+                    <div class="empty-state" style="padding: 3rem 0;">
+                        <p>You don't have any active B2B connections yet.</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Incoming Requests -->
+        {% if incoming_pending %}
+        <div class="card table-card" style="border-top: 4px solid hsl(var(--success));">
+            <div class="card-header bg-success-light">
+                <h2 class="m-0" style="color: hsl(var(--success));">Incoming Requests</h2>
+            </div>
+            <div style="padding: 0 2rem;">
+                <ul class="connection-list">
+                {% for conn in incoming_pending %}
+                    <li class="connection-item">
+                        <span><strong class="fw-700">{{ conn.requester.schema_name }}</strong> wants to connect</span>
+                        <form method="post" action="{% url 'b2b:accept_connection' conn.id %}" class="m-0">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn-sm">Accept Request</button>
+                        </form>
+                    </li>
+                {% endfor %}
+                </ul>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- RIGHT COLUMN: Send Request & Outgoing -->
+    <div class="flex-col gap-4">
+        <div class="card">
+            <h2 class="mb-2">Add Connection</h2>
+            <p class="text-sm text-muted mb-4">
+                Enter the exact shop username (domain prefix) to connect.
+            </p>
+            <form method="post" action="{% url 'b2b:request_connection' %}" class="m-0">
+                {% csrf_token %}
+                <div class="flex-row gap-2">
+                    <input type="text" name="shop_name" placeholder="e.g. shop2" required class="flex-1">
+                    <button type="submit" class="btn">Connect</button>
+                </div>
+            </form>
+        </div>
+
+        {% if outgoing_pending %}
+        <div class="card" style="background: hsla(var(--bg-hover) / 0.3);">
+            <h2 class="stat-label mb-4">Pending Outgoing</h2>
+            <ul class="connection-list">
+            {% for conn in outgoing_pending %}
+                <li class="connection-item">
+                    <span class="text-muted text-sm">Waiting for <strong class="text-white">{{ conn.receiver.schema_name }}</strong></span>
+                </li>
+            {% endfor %}
+            </ul>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

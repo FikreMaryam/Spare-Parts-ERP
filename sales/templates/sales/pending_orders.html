@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Pending Orders{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2>Pending Orders</h2>
+    
+    {% if messages %}
+        {% for message in messages %}
+            <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                {{ message }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        {% endfor %}
+    {% endif %}
+    
+    {% if pending_sales %}
+        <div class="table-responsive">
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th>Order ID</th>
+                        <th>Date</th>
+                        <th>Customer</th>
+                        <th>Total Amount</th>
+                        <th>Items</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for sale in pending_sales %}
+                        <tr>
+                            <td>{{ sale.id }}</td>
+                            <td>{{ sale.date|date:"M d, Y H:i" }}</td>
+                            <td>
+                                {% if sale.customer %}
+                                    {{ sale.customer.name }}
+                                    {% if sale.customer.email %}
+                                        <br><small class="text-muted">{{ sale.customer.email }}</small>
+                                    {% endif %}
+                                {% else %}
+                                    Walk-in
+                                {% endif %}
+                            </td>
+                            <td>${{ sale.total_amount|floatformat:2 }}</td>
+                            <td>
+                                <ul class="list-unstyled mb-0">
+                                    {% for item in sale.items.all %}
+                                        <li>{{ item.product.name }} x {{ item.quantity }}</li>
+                                    {% endfor %}
+                                </ul>
+                            </td>
+                            <td>
+                                <form method="post" class="d-inline">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="sale_id" value="{{ sale.id }}">
+                                    <button type="submit" name="action" value="approve" class="btn btn-success btn-sm me-2"
+                                            onclick="return confirm('Approve this order and deduct inventory?')">
+                                        Approve
+                                    </button>
+                                    <button type="submit" name="action" value="cancel" class="btn btn-danger btn-sm"
+                                            onclick="return confirm('Cancel this order?')">
+                                        Cancel
+                                    </button>
+                                </form>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% else %}
+        <div class="alert alert-info">
+            No pending orders at this time.
+        </div>
+    {% endif %}
+</div>
+{% endblock %}

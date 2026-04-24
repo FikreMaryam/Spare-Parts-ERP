@@ -306,20 +306,16 @@ def stockmovement_list(request):
     return render(request, "inventory/stockmovement_list.html", {"page": page, "filter_type": mtype, "search": q})
 
 
-@login_required
-def account_list(request):
-    from .models import Account
-    accounts = Account.objects.select_related("parent").order_by("code", "name")
-    return render(request, "inventory/account_list.html", {"accounts": accounts})
 
 
 @login_required
-def journalentry_list(request):
-    from .models import JournalEntry
-    entries = JournalEntry.objects.select_related("debit_account", "credit_account").order_by("-date")
-    paginator = Paginator(entries, 25)
-    page = paginator.get_page(request.GET.get("page", 1))
-    return render(request, "inventory/journalentry_list.html", {"page": page})
+def attributes_dashboard(request):
+    from .models import Category, CarMake, CarModel
+    return render(request, "inventory/attributes.html", {
+        "category_count": Category.objects.count(),
+        "make_count": CarMake.objects.count(),
+        "model_count": CarModel.objects.count(),
+    })
 
 
 @login_required

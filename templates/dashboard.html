@@ -1,64 +1,71 @@
 {% extends "base.html" %}
 
-{% block title %}Dashboard - ERP My Shop{% endblock %}
+{% block title %}Dashboard - Spare ERP{% endblock %}
+
+{% block page_title %}Dashboard{% endblock %}
 
 {% block content %}
-<h1>Dashboard</h1>
 
-<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 2rem;">
-    <div class="card" style="text-align: center;">
-        <div style="font-size: 0.85rem; color: var(--text-muted);">Total Products</div>
-        <div style="font-size: 2rem; font-weight: 700;">{{ stats.total_products }}</div>
+<div class="dashboard-grid">
+    <div class="card stat-card">
+        <div class="stat-label">Total Products</div>
+        <div class="stat-value">{{ stats.total_products }}</div>
     </div>
-    <div class="card" style="text-align: center;">
-        <div style="font-size: 0.85rem; color: var(--text-muted);">Low Stock</div>
-        <div style="font-size: 2rem; font-weight: 700; color: var(--error);">{{ stats.low_stock_count }}</div>
+    <div class="card stat-card">
+        <div class="stat-label">Low Stock</div>
+        <div class="stat-value text-error">{{ stats.low_stock_count }}</div>
     </div>
-    <div class="card" style="text-align: center;">
-        <div style="font-size: 0.85rem; color: var(--text-muted);">Total Sales</div>
-        <div style="font-size: 2rem; font-weight: 700;">{{ stats.total_sales }}</div>
+    <div class="card stat-card">
+        <div class="stat-label">Total Sales</div>
+        <div class="stat-value">{{ stats.total_sales }}</div>
     </div>
-    <div class="card" style="text-align: center;">
-        <div style="font-size: 0.85rem; color: var(--text-muted);">Revenue</div>
-        <div style="font-size: 2rem; font-weight: 700;">{{ stats.total_revenue|floatformat:2 }}</div>
+    <div class="card stat-card">
+        <div class="stat-label">Revenue</div>
+        <div class="stat-value">${{ stats.total_revenue|floatformat:2 }}</div>
     </div>
 </div>
 
 <div class="card">
-    <h2>Quick Actions</h2>
-    <p>
+    <h2 class="mb-4">Quick Actions</h2>
+    <div class="actions-wrapper">
         <a href="{% url 'pos' %}" class="btn">Point of Sale</a>
-        <a href="{% url 'product_list' %}" class="btn btn-secondary" style="margin-left: 0.5rem;">Inventory</a>
-        <a href="{% url 'purchase_add' %}" class="btn btn-secondary" style="margin-left: 0.5rem;">Add Purchase</a>
-        <a href="{% url 'sales_report' %}" class="btn btn-secondary" style="margin-left: 0.5rem;">Sales Report</a>
-        <a href="{% url 'business_report' %}" class="btn btn-secondary" style="margin-left: 0.5rem;">Business Report</a>
-        <a href="{% url 'employee_list' %}" class="btn btn-secondary" style="margin-left: 0.5rem;">Employees</a>
-    </p>
+        <a href="{% url 'product_list' %}" class="btn btn-secondary">Inventory</a>
+        <a href="{% url 'purchase_add' %}" class="btn btn-secondary">Add Purchase</a>
+        <a href="{% url 'sales_report' %}" class="btn btn-secondary">Sales Report</a>
+        <a href="{% url 'employee_list' %}" class="btn btn-secondary">Employees</a>
+    </div>
 </div>
 
 {% if recent_sales %}
-<div class="card">
-    <h2>Recent Sales</h2>
-    <table>
-        <thead>
-            <tr>
-                <th>ID</th>
-                <th>Date</th>
-                <th>Total</th>
-                <th></th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for sale in recent_sales %}
-            <tr>
-                <td>{{ sale.id }}</td>
-                <td>{{ sale.date|date:"M d, Y H:i" }}</td>
-                <td>{{ sale.total_amount|floatformat:2 }}</td>
-                <td><a href="{% url 'invoice' sale.id %}" class="btn btn-secondary" style="padding: 0.4rem 0.8rem; font-size: 0.85rem;">View</a></td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
+<div class="card table-card">
+    <div class="card-header">
+        <h2 class="m-0">Recent Sales</h2>
+    </div>
+    <div class="table-container">
+        <table>
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Date</th>
+                    <th>Total</th>
+                    <th class="text-right">Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for sale in recent_sales %}
+                <tr>
+                    <td class="fw-700">#{{ sale.id }}</td>
+                    <td class="text-muted">{{ sale.date|date:"M d, Y H:i" }}</td>
+                    <td class="fw-700">${{ sale.total_amount|floatformat:2 }}</td>
+                    <td class="text-right">
+                        <a href="{% url 'invoice' sale.id %}" class="btn btn-secondary btn-sm">View</a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
 </div>
 {% endif %}
+
 {% endblock %}
