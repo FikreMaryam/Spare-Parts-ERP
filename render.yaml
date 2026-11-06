@@ -1,0 +1,30 @@
+services:
+  - type: web
+    name: spare-parts-erp
+    runtime: docker
+    plan: starter
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    disk:
+      name: uploaded-media
+      mountPath: /var/data
+      sizeGB: 1
+    envVars:
+      - key: DEBUG
+        value: "False"
+      - key: USE_SQLITE
+        value: "False"
+      - key: DJANGO_SECRET_KEY
+        generateValue: true
+      - key: DATABASE_URL
+        fromDatabase:
+          name: spare-parts-erp-db
+          property: connectionString
+      - key: MEDIA_ROOT
+        value: /var/data/media
+
+databases:
+  - name: spare-parts-erp-db
+    plan: basic-256mb
+    databaseName: erp_saas
+    user: erp_user

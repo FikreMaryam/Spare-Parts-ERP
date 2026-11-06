@@ -12,12 +12,13 @@ from customers.models import Client, Domain
 
 
 class Command(BaseCommand):
-    help = "Create the first shop and its administrator for LAN hosting."
+    help = "Create the first shop and its administrator for LAN or hosted deployment."
 
     def handle(self, *args, **options):
-        lan_ip = os.getenv("LAN_IP")
-        if not lan_ip:
-            raise CommandError("Set LAN_IP in the environment before creating the shop.")
+        is_render = bool(os.getenv("RENDER_EXTERNAL_HOSTNAME"))
+        host = os.getenv("RENDER_EXTERNAL_HOSTNAME") or os.getenv("LAN_IP")
+        if not host:
+            raise CommandError("Set RENDER_EXTERNAL_HOSTNAME or LAN_IP before creating the shop.")
 
         if Client.objects.exclude(schema_name="public").exists():
             raise CommandError("A shop tenant already exists; refusing to create another.")
@@ -48,7 +49,7 @@ class Command(BaseCommand):
 
         tenant = Client(schema_name=schema_name, name=shop_name)
         tenant.save()
-        Domain.objects.create(domain=lan_ip, tenant=tenant, is_primary=True)
+        Domain.objects.create(domain=host, tenant=tenant, is_primary=True)
 
         with tenant_context(tenant):
             User.objects.create_superuser(
@@ -58,5 +59,6 @@ class Command(BaseCommand):
             )
 
         self.stdout.write(self.style.SUCCESS(
-            f"Shop created. Open http://{lan_ip}:8000/login/ and sign in as {username}."
+            f"Shop created. Open {'https' if is_render else 'http'}://{host}"
+            f"{'' if is_render else ':8000'}/login/ and sign in as {username}."
         ))
