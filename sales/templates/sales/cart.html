@@ -1,99 +1,385 @@
 {% extends "base.html" %}
 
-{% block title %}Cart - ERP My Shop{% endblock %}
+{% block title %}Shopping Cart & Checkout - {{ app_name }}{% endblock %}
+
+{% block page_title %}Shopping Cart & Checkout{% endblock %}
 
 {% block extra_css %}
 <style>
+.cart-card {
+    background: hsl(var(--card));
+    border: 1px solid hsl(var(--border));
+    border-radius: var(--radius-lg, 12px);
+    padding: 1.75rem;
+    margin-bottom: 2rem;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+}
 .cart-table {
     width: 100%;
     border-collapse: collapse;
 }
 .cart-table th, .cart-table td {
-    padding: 0.75rem 1rem;
-    border-bottom: 1px solid var(--border);
+    padding: 0.85rem 1rem;
+    border-bottom: 1px solid hsl(var(--border));
 }
-.cart-table th { background: var(--bg-hover); color: var(--text-muted); }
+.cart-table th { 
+    background: hsla(var(--bg-hover) / 0.6); 
+    color: hsl(var(--text-muted));
+    font-size: 0.82rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    font-weight: 700;
+}
+.cart-checkout-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 1.5rem;
+    margin-top: 1.5rem;
+    padding-top: 1.5rem;
+    border-top: 1px dashed hsl(var(--border));
+}
 </style>
 {% endblock %}
 
 {% block content %}
-<h1><a href="{% url 'pos' %}">&larr; Continue Shopping</a></h1>
+<div class="header-actions" style="margin-bottom: 1.25rem;">
+    <a href="{% url 'pos' %}" class="btn btn-secondary btn-sm">← Continue Shopping / POS</a>
+</div>
+
 {% if errors %}
-<div class="card errors"><ul>{% for e in errors %}<li>{{ e }}</li>{% endfor %}</ul></div>
+<div class="card badge-error" style="border-radius: 8px; padding: 1rem 1.5rem; margin-bottom: 1.5rem; background: #fee2e2; color: #b91c1c;">
+    <ul style="margin: 0; padding-left: 1.2rem;">
+        {% for e in errors %}
+        <li>{{ e }}</li>
+        {% endfor %}
+    </ul>
+</div>
 {% endif %}
-<form method="post">
-    {% csrf_token %}
-    <table class="cart-table">
-        <thead>
-            <tr>
-                <th>Product</th>
-                <th>Qty</th>
-                <th>Price</th>
-                <th>Remove</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for p, qty, override in products %}
-            <tr>
-                <td><a href="{% url 'product_detail' p.id %}">{{ p.name }}</a></td>
-                <td><input type="number" name="qty_{{ p.id }}" value="{{ qty }}" min="0" max="{{ p.quantity }}" style="width:60px;"></td>
-                <td><input type="number" step="0.01" name="price_{{ p.id }}" value="{% if override %}{{ override }}{% endif %}" placeholder="{{ p.selling_price }}" style="width:80px;"></td>
-                <td><a href="{% url 'remove_from_cart' p.id %}" class="btn-secondary btn">X</a></td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
-    <hr>
-    <!-- reuse customer/payment form from pos_single -->
-    <div class="customer-payment">
-        <div>
-            <p class="customer-choice">
-                <strong>Customer:</strong>
-                <label><input type="radio" name="customer_type" value="existing" checked> Existing</label>
-                <label><input type="radio" name="customer_type" value="new"> New</label>
-            </p>
-            <div id="existing-customer">
-                <input type="text" name="customer_name" placeholder="Type to search" list="cust-list">
-                <datalist id="cust-list">
-                    {% for c in customers %}
-                        <option value="{{ c.name }}">{{ c.phone }}</option>
+
+<div class="cart-card">
+    <form method="post" enctype="multipart/form-data">
+        {% csrf_token %}
+        <div class="table-container">
+            <table class="cart-table">
+                <thead>
+                    <tr>
+                        <th style="width: 45%;">Spare Part</th>
+                        <th style="width: 15%; text-align: center;">Qty</th>
+                        <th style="width: 25%;">Selling Price (ETB)</th>
+                        <th style="width: 15%; text-align: center;">Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for p, qty, override in products %}
+                    <tr>
+                        <td>
+                            <a href="{% url 'product_detail' p.id %}" style="font-weight: 700; text-decoration: none; color: inherit;">{{ p.name }}</a>
+                            <div style="font-size: 0.8rem; color: hsl(var(--text-muted)); font-family: monospace;">Part #: {{ p.part_number|default:"—" }} · Available: {{ p.quantity }}</div>
+                        </td>
+                        <td style="text-align: center;">
+                            <input type="number" name="qty_{{ p.id }}" value="{{ qty }}" min="1" max="{{ p.quantity }}" class="form-input" style="width: 80px; text-align: center; display: inline-block;">
+                        </td>
+                        <td>
+                            <input type="number" step="0.01" name="price_{{ p.id }}" value="{% if override %}{{ override }}{% else %}{{ p.selling_price }}{% endif %}" class="form-input" style="max-width: 140px;">
+                        </td>
+                        <td style="text-align: center;">
+                            <a href="{% url 'remove_from_cart' p.id %}" class="btn btn-danger btn-sm" title="Remove item">✕ Remove</a>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="4" class="empty-state" style="padding: 3rem 1rem; text-align: center;">
+                            <p>Your cart is empty.</p>
+                            <a href="{% url 'pos' %}" class="btn btn-primary btn-sm" style="margin-top: 0.5rem;">Browse POS Catalog</a>
+                        </td>
+                    </tr>
                     {% endfor %}
-                </datalist>
+                </tbody>
+            </table>
+        </div>
+
+        {% if products %}
+        <div class="cart-checkout-grid" style="grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 1.75rem;">
+            <!-- Buyer / Customer Tax Information -->
+            <div style="background: hsla(var(--bg-hover) / 0.4); padding: 1.25rem; border-radius: 10px; border: 1px solid hsl(var(--border));">
+                <h3 style="font-size: 1.05rem; margin: 0 0 0.85rem 0; display: flex; align-items: center; gap: 0.5rem;">
+                    <span>🏢</span> Buyer & Tax Details (Billed To)
+                </h3>
+                
+                <div style="display: flex; gap: 1.25rem; margin-bottom: 1rem;">
+                    <label style="cursor: pointer; display: flex; align-items: center; gap: 0.4rem; font-weight: 600; font-size: 0.9rem;">
+                        <input type="radio" name="customer_type" value="existing" checked> Existing Customer
+                    </label>
+                    <label style="cursor: pointer; display: flex; align-items: center; gap: 0.4rem; font-weight: 600; font-size: 0.9rem;">
+                        <input type="radio" name="customer_type" value="new"> New Buyer / Company
+                    </label>
+                </div>
+
+                <!-- Existing Customer Picker -->
+                <div id="existing-customer-block" style="margin-bottom: 0.85rem;">
+                    <label style="font-size: 0.82rem; font-weight: 600; display: block; margin-bottom: 0.3rem;">Select Customer / Business:</label>
+                    <select id="cust-select" name="customer_id" class="form-select" style="width: 100%;">
+                        <option value="">-- Choose Existing Customer or Type Name --</option>
+                        {% for c in customers %}
+                            <option value="{{ c.id }}" data-phone="{{ c.phone }}" data-company="{{ c.company_name }}" data-tin="{{ c.tin_number }}" data-vat="{{ c.vat_number }}" data-address="{{ c.address }}">
+                                {{ c.name }}{% if c.company_name %} ({{ c.company_name }}){% endif %}{% if c.tin_number %} - TIN: {{ c.tin_number }}{% endif %}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <!-- Buyer Fields Grid -->
+                <div style="display: flex; flex-direction: column; gap: 0.65rem;">
+                    <div style="border: 1px solid hsl(var(--border)); border-radius: 10px; padding: 0.9rem 1rem; background: hsla(var(--accent) / 0.04);">
+                        <label style="display: block; font-size: 0.82rem; font-weight: 700; margin-bottom: 0.4rem; color: hsl(var(--text));">Sales Receipt / Supporting Document</label>
+                        <input type="file" name="sales_receipt" accept=".pdf,.png,.jpg,.jpeg,.webp,.gif" class="form-input" style="width: 100%; padding: 0.65rem 0.85rem; border-radius: 8px; border: 1px solid hsl(var(--border)); background: hsl(var(--bg)); color: hsl(var(--text)); font-size: 0.95rem;">
+                        <small style="display: block; margin-top: 0.35rem; color: hsl(var(--text-muted));">Attach a sales receipt, proof of payment, or approval document.</small>
+                    </div>
+
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.65rem;">
+                        <div>
+                            <label style="font-size: 0.82rem; font-weight: 600; display: block; margin-bottom: 0.25rem;">Buyer Company Name:</label>
+                            <input type="text" id="buyer_company" name="company_name" class="form-input" placeholder="e.g. Addis Motors PLC" style="width: 100%;">
+                        </div>
+                        <div>
+                            <label style="font-size: 0.82rem; font-weight: 600; display: block; margin-bottom: 0.25rem;">Buyer / Contact Name:</label>
+                            <input type="text" id="buyer_name" name="new_name" class="form-input" placeholder="e.g. Abebe Kebede" style="width: 100%;">
+                        </div>
+                    </div>
+
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.65rem;">
+                        <div>
+                            <label style="font-size: 0.82rem; font-weight: 600; display: block; margin-bottom: 0.25rem;">Buyer TIN Number:</label>
+                            <input type="text" id="buyer_tin" name="tin_number" class="form-input" placeholder="e.g. 0012345678" style="width: 100%;">
+                        </div>
+                        <div>
+                            <label style="font-size: 0.82rem; font-weight: 600; display: block; margin-bottom: 0.25rem;">Phone Number:</label>
+                            <input type="text" id="buyer_phone" name="phone" class="form-input" placeholder="e.g. 0911223344" style="width: 100%;">
+                        </div>
+                    </div>
+
+                    <div>
+                        <label style="font-size: 0.82rem; font-weight: 600; display: block; margin-bottom: 0.25rem;">Buyer Address / City (Optional):</label>
+                        <input type="text" id="buyer_address" name="address" class="form-input" placeholder="e.g. Bole Sub-city, Addis Ababa" style="width: 100%;">
+                    </div>
+
+                    <!-- Customer Vehicle Fleet Selection -->
+                    <div style="background: hsl(var(--card)); border: 1px solid hsl(var(--border)); padding: 0.75rem; border-radius: 8px; margin-top: 0.35rem;">
+                        <label style="font-size: 0.82rem; font-weight: 700; display: block; margin-bottom: 0.3rem;">
+                            🚗 Vehicle / Fleet Unit (ተሽከርካሪ):
+                        </label>
+                        <select id="vehicle-select" name="vehicle_id" class="form-select" style="width: 100%; margin-bottom: 0.4rem;">
+                            <option value="">-- General / No Specific Vehicle --</option>
+                        </select>
+                        <div id="new-vehicle-quick-row" style="display: flex; gap: 0.4rem;">
+                            <input type="text" name="new_vehicle_plate" placeholder="Plate # (e.g. 2-B12345 AA)" class="form-input" style="flex: 1; font-family: monospace; font-size: 0.85rem; text-transform: uppercase;">
+                            <input type="text" name="new_vehicle_desc" placeholder="Car / Model (e.g. Hilux Vigo)" class="form-input" style="flex: 1; font-size: 0.85rem;">
+                        </div>
+                    </div>
+                </div>
             </div>
-            <div id="new-customer" style="display:none;">
-                <p><label>Name: <input type="text" name="new_name"></label></p>
-                <p><label>Phone: <input type="text" name="new_phone"></label></p>
+
+            <!-- Payment Method, Fiscal Meta & Checkout -->
+            <div style="display: flex; flex-direction: column; justify-content: space-between; background: hsla(var(--bg-hover) / 0.4); padding: 1.25rem; border-radius: 10px; border: 1px solid hsl(var(--border));">
+                <div>
+                    <h3 style="font-size: 1.05rem; margin: 0 0 0.85rem 0; display: flex; align-items: center; gap: 0.5rem;">
+                        <span>🧾</span> Fiscal Receipt & Payment
+                    </h3>
+
+                    <div style="margin-bottom: 0.85rem;">
+                        <label style="font-size: 0.82rem; font-weight: 600; display: block; margin-bottom: 0.25rem;">Payment Method:</label>
+                        <select id="payment-method-select" name="payment_method" class="form-select" style="width: 100%; font-weight: 600;" onchange="onPaymentMethodChanged(this.value)">
+                            {% for code, label in Sale.PAYMENT_METHOD_CHOICES %}
+                                <option value="{{ code }}" {% if code == 'CASH' %}selected{% endif %}>{{ label }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <!-- Mobile Money / Bank Transfer Reference Field -->
+                    <div id="payment-ref-container" style="margin-bottom: 0.85rem; display: none; background: #f0fdf4; border: 1px solid #86efac; padding: 0.75rem; border-radius: 8px;">
+                        <label style="font-size: 0.82rem; font-weight: 700; color: #166534; display: block; margin-bottom: 0.25rem;">
+                            📱 Mobile / Bank Transaction Ref # (የግብይት መለያ ቁጥር):
+                        </label>
+                        <div style="display: flex; gap: 0.5rem;">
+                            <input type="text" id="payment_reference_input" name="payment_reference" placeholder="e.g. CK79812456 or FT26102..." class="form-input" style="font-family: monospace; font-weight: 700; text-transform: uppercase;" onblur="verifyPaymentRef(this.value)">
+                            <button type="button" class="btn btn-secondary btn-sm" onclick="verifyPaymentRef(document.getElementById('payment_reference_input').value)">Check</button>
+                        </div>
+                        <div id="payment-ref-status" style="font-size: 0.78rem; margin-top: 0.35rem; font-weight: 600;"></div>
+                    </div>
+
+                    <div style="margin-bottom: 1rem;">
+                        <label style="font-size: 0.82rem; font-weight: 600; display: block; margin-bottom: 0.25rem;">
+                            Fiscal Sales Receipt (FS) Number:
+                        </label>
+                        <input type="text" name="fs_number" class="form-input" placeholder="Auto-generate if blank (e.g. FS-000412)" style="width: 100%; font-family: monospace;">
+                        <span style="font-size: 0.76rem; color: hsl(var(--text-muted)); display: block; margin-top: 0.2rem;">
+                            ℹ️ Leave blank to automatically assign the next sequential FS receipt number.
+                        </span>
+                    </div>
+
+                    <!-- Live Totals Breakdown -->
+                    <div style="background: hsl(var(--card)); border: 1px solid hsl(var(--border)); border-radius: 8px; padding: 0.85rem; margin-bottom: 1rem;">
+                        <div style="display: flex; justify-content: space-between; font-size: 0.88rem; color: hsl(var(--text-muted)); margin-bottom: 0.3rem;">
+                            <span>Subtotal (Excl. VAT):</span>
+                            <span id="summary-subtotal" style="font-weight: 600; font-family: monospace;">0.00 ETB</span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; font-size: 0.88rem; color: hsl(var(--text-muted)); margin-bottom: 0.4rem;">
+                            <span>15% VAT (Ethiopian Tax):</span>
+                            <span id="summary-vat" style="font-weight: 600; font-family: monospace;">0.00 ETB</span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; font-size: 1.15rem; font-weight: 800; border-top: 1px dashed hsl(var(--border)); padding-top: 0.45rem; color: hsl(var(--accent));">
+                            <span>Total Payable:</span>
+                            <span id="summary-total" style="font-family: monospace;">0.00 ETB</span>
+                        </div>
+                    </div>
+                </div>
+
+                <button type="submit" class="btn btn-primary btn-lg" style="width: 100%; font-weight: 700; padding: 0.85rem; font-size: 1.05rem; display: flex; align-items: center; justify-content: center; gap: 0.5rem;">
+                    <span>✓</span> Complete Sale & Issue Fiscal Invoice
+                </button>
             </div>
         </div>
-        <div>
-            <p><label>Payment method:</label>
-                <select name="payment_method" style="width:100%;">
-                    {% for code,label in Sale.PAYMENT_METHOD_CHOICES %}
-                        <option value="{{ code }}">{{ label }}</option>
-                    {% endfor %}
-                </select>
-            </p>
-        </div>
-    </div>
-    <p style="text-align:center; margin-top:1rem;"><button type="submit" class="btn">Checkout</button></p>
-</form>
+        {% endif %}
+    </form>
+</div>
+
 <script>
-    document.addEventListener('DOMContentLoaded', function() {
-        const existingRadio = document.querySelector('input[name="customer_type"][value="existing"]');
-        const newRadio = document.querySelector('input[name="customer_type"][value="new"]');
-        const existingDiv = document.getElementById('existing-customer');
-        const newDiv = document.getElementById('new-customer');
-        function toggleCustomer() {
-            if (newRadio.checked) {
-                existingDiv.style.display = 'none';
-                newDiv.style.display = 'block';
+document.addEventListener('DOMContentLoaded', function() {
+    const custSelect = document.getElementById('cust-select');
+    const companyInput = document.getElementById('buyer_company');
+    const nameInput = document.getElementById('buyer_name');
+    const tinInput = document.getElementById('buyer_tin');
+    const phoneInput = document.getElementById('buyer_phone');
+    const addressInput = document.getElementById('buyer_address');
+    const existingBlock = document.getElementById('existing-customer-block');
+    const existingRadio = document.querySelector('input[name="customer_type"][value="existing"]');
+    const newRadio = document.querySelector('input[name="customer_type"][value="new"]');
+
+    if (custSelect) {
+        custSelect.addEventListener('change', function() {
+            const opt = custSelect.options[custSelect.selectedIndex];
+            if (opt && opt.value) {
+                if (companyInput) companyInput.value = opt.getAttribute('data-company') || '';
+                if (nameInput) nameInput.value = opt.text.split('(')[0].split('-')[0].trim();
+                if (tinInput) tinInput.value = opt.getAttribute('data-tin') || '';
+                if (phoneInput) phoneInput.value = opt.getAttribute('data-phone') || '';
+                if (addressInput) addressInput.value = opt.getAttribute('data-address') || '';
+
+                // Load vehicles registered to this customer
+                loadCustomerVehicles(opt.value);
             } else {
-                existingDiv.style.display = 'block';
-                newDiv.style.display = 'none';
+                resetVehiclesDropdown();
             }
+        });
+    }
+
+    function resetVehiclesDropdown() {
+        const vSelect = document.getElementById('vehicle-select');
+        if (vSelect) {
+            vSelect.innerHTML = '<option value="">-- General / No Specific Vehicle --</option>';
         }
-        existingRadio.addEventListener('change', toggleCustomer);
-        newRadio.addEventListener('change', toggleCustomer);
+    }
+
+    function loadCustomerVehicles(customerId) {
+        fetch('/sales/api/customers/' + customerId + '/vehicles/')
+        .then(res => res.json())
+        .then(data => {
+            const vSelect = document.getElementById('vehicle-select');
+            if (!vSelect) return;
+            vSelect.innerHTML = '<option value="">-- General / No Specific Vehicle --</option>';
+            if (data.success && data.vehicles && data.vehicles.length > 0) {
+                data.vehicles.forEach(v => {
+                    const option = document.createElement('option');
+                    option.value = v.id;
+                    option.textContent = '🚗 ' + v.display_title;
+                    vSelect.appendChild(option);
+                });
+            }
+        })
+        .catch(err => console.log('Error loading customer vehicles', err));
+    }
+
+    window.onPaymentMethodChanged = function(method) {
+        const refBox = document.getElementById('payment-ref-container');
+        if (!refBox) return;
+        if (method === 'TELEBIRR' || method === 'CBE_BIRR' || method === 'TRANSFER' || method === 'ATM') {
+            refBox.style.display = 'block';
+        } else {
+            refBox.style.display = 'none';
+        }
+    };
+
+    window.verifyPaymentRef = function(ref) {
+        const statusBox = document.getElementById('payment-ref-status');
+        if (!ref || !ref.trim()) {
+            if (statusBox) statusBox.textContent = '';
+            return;
+        }
+        fetch('/sales/api/payments/verify/?ref=' + encodeURIComponent(ref.trim()))
+        .then(res => res.json())
+        .then(data => {
+            if (!statusBox) return;
+            if (data.used) {
+                statusBox.style.color = '#dc2626';
+                statusBox.textContent = '⚠️ ' + data.error;
+            } else if (data.pre_recorded) {
+                statusBox.style.color = '#16a34a';
+                statusBox.textContent = '✓ ' + data.message;
+            } else {
+                statusBox.style.color = '#0284c7';
+                statusBox.textContent = '✓ Reference available for new payment recording.';
+            }
+        });
+    };
+
+    function toggleCustomerMode() {
+        if (!existingBlock) return;
+        if (newRadio && newRadio.checked) {
+            existingBlock.style.display = 'none';
+            if (custSelect) custSelect.value = '';
+            if (companyInput) companyInput.value = '';
+            if (nameInput) nameInput.value = '';
+            if (tinInput) tinInput.value = '';
+            if (phoneInput) phoneInput.value = '';
+            if (addressInput) addressInput.value = '';
+        } else {
+            existingBlock.style.display = 'block';
+        }
+    }
+
+    if (existingRadio) existingRadio.addEventListener('change', toggleCustomerMode);
+    if (newRadio) newRadio.addEventListener('change', toggleCustomerMode);
+
+    // Live calculation of subtotal, VAT, and total
+    function updateTotals() {
+        let total = 0;
+        const rows = document.querySelectorAll('.cart-table tbody tr');
+        rows.forEach(function(row) {
+            const qtyInput = row.querySelector('input[name^="qty_"]');
+            const priceInput = row.querySelector('input[name^="price_"]');
+            if (qtyInput && priceInput) {
+                const q = parseFloat(qtyInput.value) || 0;
+                const p = parseFloat(priceInput.value) || 0;
+                total += q * p;
+            }
+        });
+
+        const subtotal = total > 0 ? (total / 1.15) : 0;
+        const vat = total > 0 ? (total - subtotal) : 0;
+
+        const subElem = document.getElementById('summary-subtotal');
+        const vatElem = document.getElementById('summary-vat');
+        const totElem = document.getElementById('summary-total');
+
+        if (subElem) subElem.textContent = subtotal.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + ' ETB';
+        if (vatElem) vatElem.textContent = vat.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + ' ETB';
+        if (totElem) totElem.textContent = total.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + ' ETB';
+    }
+
+    document.querySelectorAll('.cart-table input').forEach(function(inp) {
+        inp.addEventListener('input', updateTotals);
     });
+    updateTotals();
+});
 </script>
 {% endblock %}

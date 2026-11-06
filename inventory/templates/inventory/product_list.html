@@ -1,19 +1,87 @@
 {% extends "base.html" %}
 {% load inventory_extras %}
 
-{% block title %}Inventory - Spare ERP{% endblock %}
+{% block title %}Inventory - {{ app_name }}{% endblock %}
 
 {% block page_title %}Inventory{% endblock %}
 
+{% block extra_css %}
+<style>
+.fitment-bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.75rem 1rem;
+    background: hsla(var(--accent) / 0.05);
+    border: 1px solid hsla(var(--accent) / 0.2);
+    border-radius: var(--radius-md, 8px);
+    margin-top: 0.75rem;
+}
+.fitment-label {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: hsl(var(--accent));
+}
+.fitment-active-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.35rem 0.75rem;
+    background: hsla(var(--accent) / 0.15);
+    border: 1px solid hsl(var(--accent));
+    border-radius: 9999px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: hsl(var(--accent));
+    margin-left: 0.5rem;
+}
+.fitment-clear-pill {
+    color: hsl(var(--accent));
+    font-weight: 700;
+    text-decoration: none;
+    padding: 0 0.25rem;
+    cursor: pointer;
+}
+.car-chip {
+    display: inline-block;
+    padding: 0.2rem 0.5rem;
+    background: hsla(var(--accent) / 0.1);
+    color: hsl(var(--foreground));
+    border: 1px solid hsla(var(--border) / 0.8);
+    border-radius: 6px;
+    font-size: 0.78rem;
+    font-weight: 500;
+    white-space: nowrap;
+    margin: 2px 2px 2px 0;
+}
+.car-chip-more {
+    display: inline-block;
+    padding: 0.2rem 0.45rem;
+    background: hsla(var(--bg-hover) / 0.8);
+    color: hsl(var(--text-muted));
+    border: 1px solid hsl(var(--border));
+    border-radius: 6px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    cursor: help;
+}
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="header-actions">
-    {% if request.user.is_superuser %}
+    {% if request.user.is_superuser or request.user.is_staff %}
     <a href="{% url 'product_create' %}" class="btn btn-sm">Add New Product</a>
     {% endif %}
 </div>
 
 <div class="card">
     <form method="get" class="inventory-toolbar" id="filter-form">
+        <!-- Row 1: General Filters -->
         <div class="toolbar-row">
             <input type="text" name="q" value="{{ search }}" placeholder="Search name, part #, brand, location or chassis..." class="search-input">
             <select name="category">
@@ -39,11 +107,47 @@
                 <option value="100" {% if per_page == 100 %}selected{% endif %}>100 per page</option>
             </select>
             <button type="submit" class="btn">Apply Filters</button>
-            {% if search or filter_category or filter_brand or filter_stock or per_page != 25 %}
+            {% if search or filter_category or filter_brand or filter_stock or filter_make or filter_model or per_page != 25 %}
             <a href="{% url 'product_list' %}" class="btn btn-secondary">Clear</a>
             {% endif %}
         </div>
+
+        <!-- Row 2: Vehicle Fitment Finder -->
+        <div class="fitment-bar">
+            <span class="fitment-label">🚗 Vehicle Fitment Finder:</span>
+            
+            <select name="make" id="filter-make" onchange="onMakeFilterChanged(this.value)" style="min-width: 170px;">
+                <option value="">All Vehicle Makes (33 makes)</option>
+                {% for m in car_makes %}
+                <option value="{{ m.id }}" {% if filter_make == m.id|stringformat:"s" %}selected{% endif %}>{{ m.name }} ({{ m.models.count }})</option>
+                {% endfor %}
+            </select>
+
+            <select name="carmodel" id="filter-carmodel" style="min-width: 240px;">
+                <option value="">All Compatible Models</option>
+                {% for m in car_makes %}
+                    {% for mod in m.models.all %}
+                    <option value="{{ mod.id }}"
+                            data-make-id="{{ m.id }}"
+                            {% if filter_model == mod.id|stringformat:"s" %}selected{% endif %}
+                            {% if filter_make and filter_make != m.id|stringformat:"s" %}style="display:none;"{% endif %}>
+                        {{ m.name }} {{ mod.name }} ({{ mod.year_from }}–{{ mod.year_to|default:'Present' }})
+                    </option>
+                    {% endfor %}
+                {% endfor %}
+            </select>
+
+            <button type="submit" class="btn btn-sm">Filter by Car</button>
+
+            {% if active_make or active_model %}
+            <div class="fitment-active-badge">
+                <span>🚗 Filtered by: <strong>{{ active_make.name }}{% if active_model %} {{ active_model.name }}{% endif %}</strong></span>
+                <a href="{% url 'product_list' %}?{% if search %}q={{ search }}&{% endif %}{% if filter_category %}category={{ filter_category }}&{% endif %}{% if filter_brand %}brand={{ filter_brand }}&{% endif %}{% if filter_stock %}stock={{ filter_stock }}&{% endif %}" class="fitment-clear-pill" title="Remove vehicle filter">✕</a>
+            </div>
+            {% endif %}
+        </div>
     </form>
+
     <div class="toolbar-actions">
         <a href="{% url 'export_inventory' %}{% if request.GET %}?{{ request.GET.urlencode }}{% endif %}" class="btn btn-secondary btn-sm">Export to Excel</a>
         <a href="{% url 'import_inventory' %}" class="btn btn-secondary btn-sm">Import from Excel</a>
@@ -65,6 +169,7 @@
         <table class="sortable-table">
             <thead>
                 <tr>
+                    <th style="width: 50px;">Image</th>
                     <th>{% include "inventory/_sort_header.html" with field="part" label="Part #" %}</th>
                     <th>{% include "inventory/_sort_header.html" with field="name" label="Name" %}</th>
                     <th>{% include "inventory/_sort_header.html" with field="brand" label="Brand" %}</th>
@@ -81,21 +186,35 @@
             <tbody>
                 {% for product in products %}
                 <tr>
+                    <td>
+                        {% if product.image %}
+                        <img src="{{ product.image.url }}" alt="{{ product.name }}" class="product-thumb">
+                        {% else %}
+                        <div class="product-thumb-placeholder">📦</div>
+                        {% endif %}
+                    </td>
                     <td class="fw-700">{{ product.part_number|default:"—" }}</td>
-                    <td><a href="{% url 'product_detail' product.id %}" class="fw-600">{{ product.name }}</a></td>
+                    <td class="product-name-cell"><a href="{% url 'product_detail' product.id %}" class="fw-600" title="{{ product.name }}">{{ product.name }}</a></td>
                     <td>{{ product.brand|default:"—" }}</td>
                     <td class="text-muted">{{ product.category.name|default:"—" }}</td>
-                    <td class="fw-700">{{ product.quantity }}</td>
-                    <td>${{ product.cost_price|floatformat:2 }}</td>
-                    <td>${{ product.selling_price|floatformat:2 }}</td>
-                    <td class="text-muted">{{ product.location|default:"—"|truncatewords:5 }}</td>
+                    <td class="fw-700">{{ product.quantity }} <span style="font-size: 0.78rem; font-weight: 500; color: hsl(var(--text-muted));">{{ product.uom_short }}</span></td>
+                    <td>{{ product.cost_price|floatformat:2 }} ETB</td>
+                    <td class="fw-700" style="color: hsl(var(--accent));">{{ product.selling_price|floatformat:2 }} ETB</td>
+                    <td class="location-cell text-muted" title="{{ product.location }}">{{ product.location|default:"—" }}</td>
                     <td class="car-types-cell">
                         {% if product.compatibilities.exists %}
-                            {% for cm in product.compatibilities.all %}
-                                {{ cm }}{% if not forloop.last %}, {% endif %}
-                            {% endfor %}
+                            {% with all_cars=product.compatibilities.all %}
+                                {% for cm in all_cars|slice:":2" %}
+                                <span class="car-chip" title="{{ cm.make.name }} {{ cm.name }} ({{ cm.year_from }}-{{ cm.year_to|default:'Present' }})">{{ cm }}</span>
+                                {% endfor %}
+                                {% if all_cars.count > 2 %}
+                                <span class="car-chip-more" title="{% for cm in all_cars %}{{ cm }}{% if not forloop.last %}, &#10;{% endif %}{% endfor %}">+{{ all_cars.count|add:"-2" }} more</span>
+                                {% endif %}
+                            {% endwith %}
+                        {% elif product.vehicle_application %}
+                            <span class="text-sm text-muted">{{ product.vehicle_application }}</span>
                         {% else %}
-                            {{ product.vehicle_application|default:"—"|truncatewords:10 }}
+                            <span class="text-muted">—</span>
                         {% endif %}
                     </td>
                     <td>
@@ -106,8 +225,8 @@
                         {% endif %}
                     </td>
                     <td class="actions-col">
-                        <a href="{% url 'product_detail' product.id %}" class="btn btn-secondary btn-sm">View</a>
-                        {% if request.user.is_superuser %}
+                        <a href="{% url 'product_detail' product.id %}" class="btn btn-primary btn-sm">Open Item</a>
+                        {% if request.user.is_superuser or request.user.is_staff %}
                         <a href="{% url 'product_update' product.id %}" class="btn btn-secondary btn-sm">Edit</a>
                         <a href="{% url 'product_delete' product.id %}" class="btn btn-danger btn-sm">Delete</a>
                         {% endif %}
@@ -115,8 +234,8 @@
                 </tr>
                 {% empty %}
                 <tr>
-                    <td colspan="11" class="empty-state">
-                        No products available. <a href="{% url 'import_inventory' %}" class="fw-700">Import from Excel</a> or add manually.
+                    <td colspan="12" class="empty-state">
+                        No products available. <a href="{% url 'product_create' %}" class="fw-700">Add a product</a> or <a href="{% url 'import_inventory' %}" class="fw-700">Import from Excel</a>.
                     </td>
                 </tr>
                 {% endfor %}
@@ -136,4 +255,32 @@
     </div>
     {% endif %}
 </div>
+
+<script>
+function onMakeFilterChanged(selectedMakeId) {
+    const modelSelect = document.getElementById('filter-carmodel');
+    if (!modelSelect) return;
+
+    const options = modelSelect.querySelectorAll('option');
+    let hasCurrentModel = false;
+
+    options.forEach(opt => {
+        if (!opt.value) {
+            opt.style.display = '';
+            return;
+        }
+        const makeId = opt.getAttribute('data-make-id');
+        if (!selectedMakeId || makeId === selectedMakeId) {
+            opt.style.display = '';
+            if (opt.selected) hasCurrentModel = true;
+        } else {
+            opt.style.display = 'none';
+        }
+    });
+
+    if (!hasCurrentModel && modelSelect.value !== '') {
+        modelSelect.value = '';
+    }
+}
+</script>
 {% endblock %}

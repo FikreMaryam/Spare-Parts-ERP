@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+
+{% block title %}Inter-Branch Stock Transfer (የዕቃ ማስተላለፊያ) - {{ app_name }}{% endblock %}
+
+{% block page_title %}Inter-Branch Stock Transfer (የመደብሮች ዕቃ ማስተላለፊያ){% endblock %}
+
+{% block content %}
+<div class="header-actions" style="margin-bottom: 1.25rem;">
+    <a href="{% url 'warehouse_list' %}" class="btn btn-secondary btn-sm">← Back to Shops & Warehouses</a>
+</div>
+
+<div class="card" style="max-width: 680px; margin: 0 auto;">
+    <h3 style="font-size: 1.15rem; margin-top: 0; margin-bottom: 1.25rem; color: #0f766e; display: flex; align-items: center; gap: 0.5rem;">
+        <span>🔄</span> Transfer Parts Between Shops / Stores
+    </h3>
+
+    <form method="post">
+        {% csrf_token %}
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.25rem;">
+            <div>
+                <label style="font-size: 0.85rem; font-weight: 700; display: block; margin-bottom: 0.35rem;">Source Shop / Store (ከየት መደብር):</label>
+                <select name="source_warehouse" class="form-select" required style="width: 100%;">
+                    <option value="">-- Choose Source Store --</option>
+                    {% for w in warehouses %}
+                        <option value="{{ w.id }}" {% if request.GET.source == w.id|stringformat:"s" %}selected{% endif %}>
+                            {{ w.name }} ({{ w.get_branch_type_display }})
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <label style="font-size: 0.85rem; font-weight: 700; display: block; margin-bottom: 0.35rem;">Destination Shop / Store (ወደ የት መደብር):</label>
+                <select name="destination_warehouse" class="form-select" required style="width: 100%;">
+                    <option value="">-- Choose Destination Store --</option>
+                    {% for w in warehouses %}
+                        <option value="{{ w.id }}" {% if request.GET.dest == w.id|stringformat:"s" %}selected{% endif %}>
+                            {{ w.name }} ({{ w.get_branch_type_display }})
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+
+        <div style="margin-bottom: 1.25rem;">
+            <label style="font-size: 0.85rem; font-weight: 700; display: block; margin-bottom: 0.35rem;">Select Spare Part to Transfer (የሚተላለፈው ዕቃ):</label>
+            <select name="product_id" class="form-select" required style="width: 100%;">
+                <option value="">-- Choose Spare Part --</option>
+                {% for p in products %}
+                    <option value="{{ p.id }}">
+                        [{{ p.part_number|default:"No Part#" }}] {{ p.name }} (Total Available: {{ p.quantity }} {{ p.uom_short }})
+                    </option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div style="margin-bottom: 1.25rem;">
+            <label style="font-size: 0.85rem; font-weight: 700; display: block; margin-bottom: 0.35rem;">Quantity to Transfer (የሚተላለፍ ብዛት):</label>
+            <input type="number" step="any" name="quantity" value="1" min="0.1" required class="form-input" style="max-width: 180px;">
+        </div>
+
+        <div style="margin-bottom: 1.5rem;">
+            <label style="font-size: 0.85rem; font-weight: 700; display: block; margin-bottom: 0.35rem;">Transfer Reason / Driver / Vehicle Note (ማስታወሻ):</label>
+            <input type="text" name="notes" placeholder="e.g. Replenishment for Bole Branch retail shelf" class="form-input" style="width: 100%;">
+        </div>
+
+        <div style="display: flex; justify-content: flex-end; gap: 0.75rem;">
+            <a href="{% url 'warehouse_list' %}" class="btn btn-secondary">Cancel</a>
+            <button type="submit" class="btn" style="background: #0f766e; color: #ffffff; font-weight: 700;">
+                ✓ Confirm & Execute Stock Transfer
+            </button>
+        </div>
+    </form>
+</div>
+{% endblock %}

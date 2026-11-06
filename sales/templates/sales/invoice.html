@@ -1,47 +1,551 @@
 {% extends "base.html" %}
 
-{% block title %}Invoice #{{ sale.id }} - ERP My Shop{% endblock %}
+{% block title %}የታክስ ደረሰኝ / Tax Invoice #{{ sale.get_fs_number }} - {{ app_name }}{% endblock %}
+
+{% block page_title %}Official Ethiopian Tax Invoice / Fiscal Receipt (የሽያጭ ደረሰኝ){% endblock %}
 
 {% block content %}
-<h1>Invoice #{{ sale.id }}</h1>
 
-<div class="card">
-    <p><strong>Date:</strong> {{ sale.date|date:"F d, Y H:i" }}</p>
-    <p><strong>Payment:</strong> {{ sale.payment_method }}</p>
-    {% if sale.customer %}<p><strong>Customer:</strong> {{ sale.customer.name }}</p>{% endif %}
+<!-- Action Buttons Bar (Hidden when printing) -->
+<div class="no-print" style="display: flex; gap: 0.75rem; margin-bottom: 1.25rem; align-items: center; flex-wrap: wrap;">
+    <button onclick="window.print()" class="btn" style="background: #0f766e; color: #ffffff; font-weight: 700; display: inline-flex; align-items: center; gap: 0.5rem; cursor: pointer; border: none; padding: 0.65rem 1.35rem; border-radius: 8px; font-size: 0.95rem;">
+        🖨️ Print Single-Page Invoice (አትም)
+    </button>
+    <a href="{% url 'invoice_pdf' sale.id %}" class="btn btn-secondary" target="_blank" style="display: inline-flex; align-items: center; gap: 0.5rem; font-weight: 600; padding: 0.65rem 1.25rem;">
+        📄 Download Vector PDF Invoice
+    </a>
+    <a href="{% url 'proforma_create' %}" class="btn btn-secondary" style="display: inline-flex; align-items: center; gap: 0.5rem; font-weight: 600; padding: 0.65rem 1.25rem;">
+        📝 New Proforma (ፕሮፎርማ)
+    </a>
+    <a href="{% url 'pos' %}" class="btn btn-secondary" style="display: inline-flex; align-items: center; gap: 0.5rem; font-weight: 600; padding: 0.65rem 1.25rem;">
+        🛒 Back to POS / New Sale
+    </a>
 </div>
 
-<div class="card">
-    <table>
-        <thead>
-            <tr>
-                <th>Product</th>
-                <th>Qty</th>
-                <th>Unit Price</th>
-                <th>Cost</th>
-                <th>Total</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for item in sale.items.all %}
-            <tr>
-                <td><a href="{% url 'product_detail' item.product.id %}">{{ item.product.name }}</a> (<small>{{ item.product.part_number }}</small>)<br><small>{{ item.product.brand }}</small></td>
-                <td>{{ item.quantity }}</td>
-                <td>{{ item.price|floatformat:2 }}</td>
-                <td>{{ item.cost_price|floatformat:2 }}</td>
-                <td>{{ item.line_total|floatformat:2 }}</td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
-    <p style="margin-top: 1rem; font-size: 1.2rem;">
-        <strong>Total: {{ sale.total_amount|floatformat:2 }}</strong>
-        <span style="margin-left: 1rem;">Profit: {{ sale.profit|floatformat:2 }}</span>
-    </p>
+<!-- Printable Document Container (Guaranteed single page for up to 15 items) -->
+<div class="printable-invoice-card card" id="printable-invoice">
+    
+    <!-- Top Header: Seller Details & Official Tax Info -->
+    <div class="invoice-header">
+        <div class="seller-info">
+            <div class="tax-badge">
+                የኢትዮጵያ ገቢዎች ሚኒስቴር የታክስ ደረሰኝ &nbsp;|&nbsp; OFFICIAL ETHIOPIAN TAX INVOICE
+            </div>
+            <h1 class="shop-name">
+                {{ profile.trade_name|default:profile.name|default:"የመኪና መለዋወጫ መደብር / CAR SPARE PARTS SHOP" }}
+            </h1>
+            <div class="seller-meta">
+                <span>📍 <strong>አድራሻ / Address:</strong> {{ profile.address|default:"Woreda 07 Teklehaymanot, Addis Hope Building, AHG-022, Addis Ababa, Ethiopia" }}</span>
+            </div>
+            <div class="tax-ids">
+                <span class="id-item"><span class="lbl">የሻጭ ግ.ከ.መ.ቁ (TIN):</span> <strong>{{ profile.tin_number|default:"0081095335" }}</strong></span>
+                <span class="sep">|</span>
+                <span class="id-item"><span class="lbl">የተ.እ.ታ ቁጥር (VAT Reg):</span> <strong>{{ profile.vat_number|default:"42178020821" }}</strong></span>
+                {% if profile.phone %}
+                <span class="sep">|</span>
+                <span class="id-item"><span class="lbl">ስልክ / Tel:</span> <strong>{{ profile.phone }}</strong></span>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="fiscal-receipt-box">
+            <div class="receipt-title">የሽያጭ መመዝገቢያ ደረሰኝ / FISCAL RECEIPT</div>
+            <div class="fs-num">{{ sale.get_fs_number }}</div>
+            <div class="meta-row"><strong>የደረሰኝ ቁጥር (Ref):</strong> INV-{{ sale.id|stringformat:"06d" }}</div>
+            <div class="meta-row"><strong>ቀንና ሰዓት (Date):</strong> {{ sale.date|date:"d/m/Y H:i" }}</div>
+            <div class="meta-row"><strong>የክፍያ ዘዴ (Payment):</strong> {{ sale.get_payment_method_display|default:sale.payment_method }}</div>
+            <div class="meta-row"><strong>ገንዘብ ተቀባይ (Cashier):</strong> {% if sale.cashier %}{{ sale.cashier.get_full_name|default:sale.cashier.username|default:"Staff" }}{% else %}Staff{% endif %}</div>
+        </div>
+    </div>
+
+    <!-- Billed To (Buyer) & Branch Box -->
+    <div class="buyer-section">
+        <div class="buyer-col">
+            <span class="section-title">ለ (የገዢው ዝርዝር መረጃ) / BILLED TO (BUYER DETAILS)</span>
+            {% if sale.customer %}
+                <div class="buyer-name">{{ sale.customer.company_name|default:sale.customer.name }}</div>
+                {% if sale.customer.company_name and sale.customer.name %}
+                <div class="buyer-sub">ተወካይ / Contact: <strong>{{ sale.customer.name }}</strong></div>
+                {% endif %}
+                <div class="buyer-meta-grid">
+                    <div><strong>የገዢ ግ.ከ.መ.ቁ (TIN):</strong> <span class="mono">{{ sale.customer.tin_number|default:"የችርቻሮ / Retail Consumer" }}</span></div>
+                    {% if sale.customer.vat_number %}
+                    <div><strong>የተ.እ.ታ ቁጥር (VAT No):</strong> <span class="mono">{{ sale.customer.vat_number }}</span></div>
+                    {% endif %}
+                    {% if sale.customer.phone %}
+                    <div><strong>ስልክ / Phone:</strong> {{ sale.customer.phone }}</div>
+                    {% endif %}
+                    {% if sale.customer.address %}
+                    <div><strong>አድራሻ / City:</strong> {{ sale.customer.address }}</div>
+                    {% endif %}
+                </div>
+            {% else %}
+                <div class="buyer-name">የችርቻሮ ደንበኛ / Walk-in Counter Customer</div>
+                <div class="buyer-meta-grid">
+                    <div><strong>የገዢ ግ.ከ.መ.ቁ (TIN):</strong> Unregistered / Retail Consumer</div>
+                    <div><strong>ዓይነት / Type:</strong> Standard Over-the-Counter Cash Sale</div>
+                </div>
+            {% endif %}
+        </div>
+
+        <div class="status-col">
+            <div class="status-badge">✓ የተጠናቀቀ / COMPLETED</div>
+            <div class="tax-rule-note">
+                <div>ተጨማሪ እሴት ታክስ / VAT: <strong>15.00%</strong></div>
+                <div>የገንዘብ ዓይነት / Currency: <strong>ETB (የኢትዮጵያ ብር)</strong></div>
+                {% if sale.warehouse %}
+                <div>መደብር / Shop: <strong>{{ sale.warehouse.name }}</strong></div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Line Items Table -->
+    <div class="items-table-wrap">
+        <table class="items-table">
+            <thead>
+                <tr>
+                    <th style="width: 4%;">ተ.ቁ<br><span class="en-th">#</span></th>
+                    <th style="width: 22%;">የዕቃ ቁጥር / SKU<br><span class="en-th">Part No / OEM</span></th>
+                    <th style="width: 38%;">የዕቃው ዓይነትና ዝርዝር መግለጫ<br><span class="en-th">Spare Part Description & Fitment</span></th>
+                    <th style="width: 8%; text-align: center;">መለኪያ<br><span class="en-th">Unit</span></th>
+                    <th style="width: 8%; text-align: center;">ብዛት<br><span class="en-th">Qty</span></th>
+                    <th style="width: 10%; text-align: right;">ነጠላ ዋጋ<br><span class="en-th">Unit Price</span></th>
+                    <th style="width: 10%; text-align: right;">ጠቅላላ ዋጋ<br><span class="en-th">Total (ETB)</span></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in sale.items.all %}
+                <tr>
+                    <td class="text-center muted-idx">{{ forloop.counter }}</td>
+                    <td class="mono bold-sku">
+                        {{ item.product.part_number|default:"—" }}
+                        {% if item.product.brand %}<span class="brand-tag">{{ item.product.brand }}</span>{% endif %}
+                    </td>
+                    <td>
+                        <div class="part-name">{{ item.product.name }}</div>
+                        {% if item.product.vehicle_application %}
+                        <div class="part-fitment">🚗 {{ item.product.vehicle_application|truncatechars:40 }}</div>
+                        {% endif %}
+                    </td>
+                    <td class="text-center uom-cell">{{ item.product.uom_amharic|default:item.product.uom_short|default:"ቁራጭ" }}</td>
+                    <td class="text-center bold-qty">{{ item.quantity }}</td>
+                    <td class="text-right mono">{{ item.price|floatformat:2 }}</td>
+                    <td class="text-right mono bold-total">{{ item.line_total|floatformat:2 }}</td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="7" class="text-center" style="padding: 1rem;">ምንም የተመዘገበ ዕቃ የለም / No items recorded.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Summary Box & Footer Section -->
+    <div class="invoice-bottom-grid">
+        <div class="terms-col">
+            <div class="terms-title">ደንቦችና ማሳሰቢያዎች / Terms & Conditions:</div>
+            <ul class="terms-list">
+                <li>ዕቃ ከተሸጠ በኋላ መመለስ የሚቻለው በ3 ቀናት ውስጥ በዋናው ደረሰኝ ብቻ ነው።</li>
+                <li>Goods sold can only be returned within 3 days with this original receipt.</li>
+                <li>የኤሌክትሪክ ዕቃዎች ዋስትና አይሰጥባቸውም / Electrical parts carry manufacturer warranty only.</li>
+            </ul>
+        </div>
+
+        <div class="totals-col">
+            <div class="total-line">
+                <span class="t-lbl">ከታክስ በፊት ድምር (Subtotal):</span>
+                <span class="t-val mono">{{ sale.calculated_subtotal|floatformat:2 }} ETB</span>
+            </div>
+            <div class="total-line">
+                <span class="t-lbl">የተጨማሪ እሴት ታክስ (15% VAT):</span>
+                <span class="t-val mono">{{ sale.calculated_vat|floatformat:2 }} ETB</span>
+            </div>
+            <div class="grand-total-line">
+                <span class="gt-lbl">ጠቅላላ ድምር (Grand Total):</span>
+                <span class="gt-val mono">{{ sale.total_amount|floatformat:2 }} ETB</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Legal Footer Bar -->
+    <div class="legal-footer">
+        <div class="legal-title">
+            በኢትዮጵያ ፌዴራላዊ ዲሞክራሲያዊ ሪፐብሊክ የገቢዎች ሚኒስቴር የታክስ ደንብ መሰረት የተዘጋጀ ይፋዊ የሽያጭ ደረሰኝ
+        </div>
+        <div>
+            Seller TIN: <strong>{{ profile.tin_number|default:"0081095335" }}</strong> &nbsp;|&nbsp; 
+            VAT No: <strong>{{ profile.vat_number|default:"42178020821" }}</strong> &nbsp;|&nbsp; 
+            ስለመረጡን እናመሰግናለን! / Thank you for your business!
+        </div>
+    </div>
+
 </div>
 
-<p>
-    <a href="{% url 'invoice_pdf' sale.id %}" class="btn" target="_blank">Download PDF Invoice</a>
-    <a href="{% url 'pos' %}" class="btn btn-secondary" style="margin-left: 0.5rem;">New Sale</a>
-</p>
+<!-- High-Density Single-Page CSS & Print Stylesheet -->
+<style>
+/* Base Screen & Card Styles */
+.printable-invoice-card {
+    background: #ffffff;
+    color: #111827;
+    padding: 1.25rem 1.5rem;
+    border-radius: 8px;
+    max-width: 860px;
+    margin: 0 auto;
+    border: 1px solid #d1d5db;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Abyssinica SIL", "Noto Sans Ethiopic", sans-serif;
+    line-height: 1.25;
+}
+
+.invoice-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    border-bottom: 2px solid #0f766e;
+    padding-bottom: 0.65rem;
+    margin-bottom: 0.65rem;
+    gap: 1rem;
+}
+
+.tax-badge {
+    display: inline-block;
+    background: #0f766e;
+    color: #ffffff;
+    font-size: 0.68rem;
+    font-weight: 800;
+    padding: 0.15rem 0.5rem;
+    border-radius: 3px;
+    letter-spacing: 0.04em;
+    margin-bottom: 0.25rem;
+}
+
+.shop-name {
+    font-size: 1.25rem;
+    font-weight: 800;
+    margin: 0;
+    color: #111827;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+}
+
+.seller-meta {
+    font-size: 0.76rem;
+    color: #4b5563;
+    margin-top: 0.2rem;
+}
+
+.tax-ids {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    font-size: 0.78rem;
+    color: #1f2937;
+    margin-top: 0.25rem;
+}
+.tax-ids .sep { color: #9ca3af; }
+.tax-ids .lbl { font-weight: 700; color: #0f766e; }
+
+.fiscal-receipt-box {
+    background: #f0fdfa;
+    border: 1.5px solid #0f766e;
+    border-radius: 6px;
+    padding: 0.5rem 0.75rem;
+    text-align: right;
+    min-width: 220px;
+}
+.receipt-title {
+    font-size: 0.65rem;
+    font-weight: 800;
+    color: #0f766e;
+    text-transform: uppercase;
+}
+.fs-num {
+    font-size: 1.15rem;
+    font-weight: 800;
+    color: #0f766e;
+    font-family: monospace;
+    letter-spacing: 0.05em;
+    margin: 0.1rem 0;
+}
+.meta-row {
+    font-size: 0.72rem;
+    color: #374151;
+    margin-top: 0.1rem;
+}
+
+/* Buyer & Status Box */
+.buyer-section {
+    display: flex;
+    justify-content: space-between;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+    padding: 0.6rem 0.85rem;
+    margin-bottom: 0.65rem;
+    gap: 1rem;
+}
+.section-title {
+    font-size: 0.68rem;
+    font-weight: 800;
+    color: #64748b;
+    text-transform: uppercase;
+    display: block;
+    margin-bottom: 0.2rem;
+}
+.buyer-name {
+    font-size: 0.95rem;
+    font-weight: 800;
+    color: #0f172a;
+}
+.buyer-sub {
+    font-size: 0.75rem;
+    color: #475569;
+}
+.buyer-meta-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    font-size: 0.75rem;
+    color: #334155;
+    margin-top: 0.25rem;
+}
+.status-col {
+    text-align: right;
+}
+.status-badge {
+    display: inline-block;
+    background: #dcfce7;
+    color: #15803d;
+    font-size: 0.72rem;
+    font-weight: 800;
+    padding: 0.15rem 0.5rem;
+    border-radius: 12px;
+    border: 1px solid #86efac;
+}
+.tax-rule-note {
+    font-size: 0.7rem;
+    color: #64748b;
+    margin-top: 0.35rem;
+}
+
+/* Items Table - Ultra Compact */
+.items-table-wrap {
+    margin-bottom: 0.65rem;
+}
+.items-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.75rem;
+}
+.items-table th {
+    background: #f1f5f9;
+    color: #1e293b;
+    font-weight: 800;
+    padding: 0.35rem 0.45rem;
+    border-top: 1px solid #cbd5e1;
+    border-bottom: 2px solid #0f766e;
+    text-align: left;
+    line-height: 1.1;
+}
+.en-th {
+    font-size: 0.65rem;
+    font-weight: 600;
+    color: #64748b;
+}
+.items-table td {
+    padding: 0.3rem 0.45rem;
+    border-bottom: 1px solid #e2e8f0;
+    vertical-align: middle;
+}
+.items-table tr:last-child td {
+    border-bottom: 1.5px solid #0f766e;
+}
+.brand-tag {
+    font-size: 0.65rem;
+    color: #64748b;
+    margin-left: 0.3rem;
+}
+.part-name {
+    font-weight: 700;
+    color: #0f172a;
+}
+.part-fitment {
+    font-size: 0.68rem;
+    color: #64748b;
+}
+.uom-cell {
+    font-size: 0.72rem;
+    color: #475569;
+}
+.bold-qty { font-weight: 800; font-size: 0.82rem; }
+.bold-sku { font-size: 0.76rem; }
+.bold-total { font-weight: 800; color: #0f172a; }
+.text-center { text-align: center; }
+.text-right { text-align: right; }
+.mono { font-family: monospace; }
+.muted-idx { color: #94a3b8; font-weight: 700; }
+
+/* Totals & Bottom Section */
+.invoice-bottom-grid {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 1.5rem;
+    margin-bottom: 0.5rem;
+}
+.terms-col {
+    flex: 1;
+    font-size: 0.7rem;
+    color: #64748b;
+}
+.terms-title {
+    font-weight: 800;
+    color: #334155;
+    margin-bottom: 0.2rem;
+}
+.terms-list {
+    margin: 0;
+    padding-left: 1.1rem;
+    line-height: 1.25;
+}
+.totals-col {
+    width: 280px;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+    padding: 0.45rem 0.75rem;
+}
+.total-line {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.75rem;
+    color: #475569;
+    padding: 0.15rem 0;
+}
+.grand-total-line {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.95rem;
+    font-weight: 900;
+    color: #0f766e;
+    border-top: 1.5px dashed #0f766e;
+    margin-top: 0.25rem;
+    padding-top: 0.3rem;
+}
+
+/* Legal Footer */
+.legal-footer {
+    border-top: 1px solid #e2e8f0;
+    padding-top: 0.4rem;
+    text-align: center;
+    font-size: 0.65rem;
+    color: #64748b;
+    line-height: 1.2;
+}
+.legal-title {
+    font-weight: 700;
+    color: #334155;
+}
+
+/* STRICT SINGLE-PAGE PRINT STYLES */
+@page {
+    size: A4 portrait;
+    margin: 6mm 8mm 6mm 8mm;
+}
+
+@media print {
+    /* Hide all web interface items */
+    nav, #sidebar, .peachtree-tabs-nav, .no-print, .page-header, .sidebar-overlay, .theme-toggle-btn {
+        display: none !important;
+    }
+    
+    html, body {
+        height: auto !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        background: #ffffff !important;
+        color: #000000 !important;
+        font-size: 7.5pt !important;
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+    }
+
+    main, #main-content {
+        margin: 0 !important;
+        padding: 0 !important;
+        width: 100% !important;
+        max-width: 100% !important;
+    }
+
+    .printable-invoice-card {
+        box-shadow: none !important;
+        border: none !important;
+        max-width: 100% !important;
+        width: 100% !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        background: #ffffff !important;
+        color: #000000 !important;
+        page-break-after: avoid;
+    }
+
+    .printable-invoice-card * {
+        color: #000000 !important;
+        border-color: #cbd5e1 !important;
+    }
+
+    .tax-badge {
+        background: #0f766e !important;
+        color: #ffffff !important;
+    }
+
+    .fiscal-receipt-box {
+        background: #f0fdfa !important;
+        border: 1.5px solid #0f766e !important;
+    }
+
+    .receipt-title, .fs-num, .lbl {
+        color: #0f766e !important;
+    }
+
+    .grand-total-line {
+        color: #0f766e !important;
+    }
+
+    .items-table th {
+        background: #f1f5f9 !important;
+        color: #000000 !important;
+        font-weight: 800 !important;
+        padding: 2.5px 4px !important;
+    }
+
+    .items-table td {
+        padding: 2.5px 4px !important;
+    }
+
+    /* Single page optimization for up to 15 items */
+    .invoice-header {
+        padding-bottom: 3px !important;
+        margin-bottom: 4px !important;
+    }
+    .buyer-section {
+        padding: 4px 6px !important;
+        margin-bottom: 4px !important;
+    }
+    .items-table-wrap {
+        margin-bottom: 4px !important;
+    }
+    .totals-col {
+        padding: 3px 6px !important;
+    }
+    .invoice-bottom-grid {
+        margin-bottom: 3px !important;
+    }
+    .legal-footer {
+        padding-top: 3px !important;
+    }
+}
+</style>
+
 {% endblock %}

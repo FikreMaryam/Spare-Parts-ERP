@@ -1,0 +1,389 @@
+{% extends "base.html" %}
+
+{% block title %}Automated Payment Tracking & Mobile Reconciliation - {{ app_name }}{% endblock %}
+
+{% block page_title %}Automated Payment Tracking & Mobile Reconciliation{% endblock %}
+
+{% block extra_css %}
+<style>
+.kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 1.25rem;
+    margin-bottom: 2rem;
+}
+.kpi-card {
+    background: hsl(var(--card));
+    border: 1px solid hsl(var(--border));
+    border-radius: 12px;
+    padding: 1.5rem;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+}
+.status-pill {
+    padding: 0.25rem 0.65rem;
+    border-radius: 20px;
+    font-size: 0.78rem;
+    font-weight: 700;
+    display: inline-block;
+}
+.status-VERIFIED { background: #dbeafe; color: #1e40af; border: 1px solid #93c5fd; }
+.status-RECONCILED { background: #dcfce7; color: #15803d; border: 1px solid #86efac; }
+.status-PENDING { background: #fef3c7; color: #92400e; border: 1px solid #fcd34d; }
+.status-REJECTED { background: #fee2e2; color: #991b1b; border: 1px solid #fca5a5; }
+
+.provider-badge {
+    font-size: 0.82rem;
+    font-weight: 700;
+    padding: 0.2rem 0.55rem;
+    border-radius: 6px;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+}
+.prov-TELEBIRR { background: #e0f2fe; color: #0284c7; }
+.prov-CBE_BIRR { background: #fef3c7; color: #b45309; }
+.prov-CBE_TRANSFER { background: #f3e8ff; color: #7e22ce; }
+.prov-AWASH_BIRR { background: #dcfce7; color: #15803d; }
+.prov-DASHEN_AMOLE { background: #ffedd5; color: #c2410c; }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Top Header Actions -->
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 1rem;">
+    <div>
+        <p style="color: hsl(var(--text-muted)); margin: 0; font-size: 0.95rem;">
+            Real-time tracking and automated reconciliation for Telebirr, CBE Birr, and Bank transfers.
+        </p>
+    </div>
+    <div style="display: flex; gap: 0.75rem;">
+        <button type="button" class="btn btn-primary" onclick="openPaymentModal()" style="display: flex; align-items: center; gap: 0.4rem;">
+            <span>📱</span> Record Mobile Payment / Paste SMS
+        </button>
+        <a href="{% url 'cart' %}" class="btn btn-secondary">🛒 POS Cart</a>
+    </div>
+</div>
+
+<!-- KPI Cards -->
+<div class="kpi-grid">
+    <div class="kpi-card">
+        <div style="font-size: 0.85rem; color: hsl(var(--text-muted)); font-weight: 600; text-transform: uppercase;">
+            Total Electronic Collections
+        </div>
+        <div style="font-size: 1.6rem; font-weight: 800; color: hsl(var(--accent)); margin-top: 0.35rem; font-family: monospace;">
+            {{ total_received|floatformat:2 }} ETB
+        </div>
+        <div style="font-size: 0.8rem; color: hsl(var(--text-muted)); margin-top: 0.35rem;">
+            Recorded via Telebirr, CBE Birr & Banks
+        </div>
+    </div>
+
+    <div class="kpi-card">
+        <div style="font-size: 0.85rem; color: hsl(var(--text-muted)); font-weight: 600; text-transform: uppercase;">
+            Pending Reconciliation
+        </div>
+        <div style="font-size: 1.6rem; font-weight: 800; color: #f59e0b; margin-top: 0.35rem;">
+            {{ pending_reconciliation }} Payments
+        </div>
+        <div style="font-size: 0.8rem; color: hsl(var(--text-muted)); margin-top: 0.35rem;">
+            Received but not yet matched to sales
+        </div>
+    </div>
+
+    <div class="kpi-card">
+        <div style="font-size: 0.85rem; color: hsl(var(--text-muted)); font-weight: 600; text-transform: uppercase;">
+            Reconciled Invoices
+        </div>
+        <div style="font-size: 1.6rem; font-weight: 800; color: #10b981; margin-top: 0.35rem;">
+            {{ reconciled_count }} Reconciled
+        </div>
+        <div style="font-size: 0.8rem; color: hsl(var(--text-muted)); margin-top: 0.35rem;">
+            Directly verified against fiscal sales
+        </div>
+    </div>
+</div>
+
+<!-- Filter Bar -->
+<div class="card" style="margin-bottom: 1.5rem; padding: 1.25rem;">
+    <form method="get" style="display: flex; flex-wrap: wrap; gap: 1rem; align-items: flex-end;">
+        <div style="flex: 2; min-width: 220px;">
+            <label style="font-size: 0.82rem; font-weight: 600; margin-bottom: 0.3rem; display: block;">Search Reference / Phone / FS #</label>
+            <input type="text" name="q" placeholder="e.g. CK798124, FT2610..., 0911..." value="{{ search_query }}" class="form-input">
+        </div>
+        <div style="min-width: 170px;">
+            <label style="font-size: 0.82rem; font-weight: 600; margin-bottom: 0.3rem; display: block;">Payment Provider</label>
+            <select name="provider" class="form-input">
+                <option value="">All Providers</option>
+                <option value="TELEBIRR" {% if provider_filter == "TELEBIRR" %}selected{% endif %}>Telebirr</option>
+                <option value="CBE_BIRR" {% if provider_filter == "CBE_BIRR" %}selected{% endif %}>CBE Birr</option>
+                <option value="CBE_TRANSFER" {% if provider_filter == "CBE_TRANSFER" %}selected{% endif %}>CBE Transfer</option>
+                <option value="AWASH_BIRR" {% if provider_filter == "AWASH_BIRR" %}selected{% endif %}>Awash Birr</option>
+                <option value="DASHEN_AMOLE" {% if provider_filter == "DASHEN_AMOLE" %}selected{% endif %}>Dashen / Amole</option>
+            </select>
+        </div>
+        <div style="min-width: 150px;">
+            <label style="font-size: 0.82rem; font-weight: 600; margin-bottom: 0.3rem; display: block;">Status</label>
+            <select name="status" class="form-input">
+                <option value="">All Statuses</option>
+                <option value="VERIFIED" {% if status_filter == "VERIFIED" %}selected{% endif %}>Verified (Unmatched)</option>
+                <option value="RECONCILED" {% if status_filter == "RECONCILED" %}selected{% endif %}>Reconciled</option>
+                <option value="PENDING" {% if status_filter == "PENDING" %}selected{% endif %}>Pending</option>
+            </select>
+        </div>
+        <div style="display: flex; gap: 0.5rem;">
+            <button type="submit" class="btn btn-primary">Filter</button>
+            {% if search_query or provider_filter or status_filter %}
+            <a href="{% url 'payment_list' %}" class="btn btn-secondary">Clear</a>
+            {% endif %}
+        </div>
+    </form>
+</div>
+
+<!-- Transactions Table -->
+<div class="card" style="padding: 0; overflow: hidden;">
+    <div class="table-container">
+        <table class="table" style="width: 100%; border-collapse: collapse;">
+            <thead>
+                <tr style="background: hsla(var(--bg-hover) / 0.5); border-bottom: 1px solid hsl(var(--border));">
+                    <th style="padding: 0.85rem 1rem; text-align: left;">Date / Time</th>
+                    <th style="padding: 0.85rem 1rem; text-align: left;">Provider</th>
+                    <th style="padding: 0.85rem 1rem; text-align: left;">Transaction Reference</th>
+                    <th style="padding: 0.85rem 1rem; text-align: right;">Amount (ETB)</th>
+                    <th style="padding: 0.85rem 1rem; text-align: left;">Payer / Phone</th>
+                    <th style="padding: 0.85rem 1rem; text-align: center;">Status</th>
+                    <th style="padding: 0.85rem 1rem; text-align: left;">Matched Sale Invoice</th>
+                    <th style="padding: 0.85rem 1rem; text-align: center;">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for p in payments %}
+                <tr style="border-bottom: 1px solid hsl(var(--border));">
+                    <td style="padding: 0.85rem 1rem; font-size: 0.88rem; color: hsl(var(--text-muted)); white-space: nowrap;">
+                        {{ p.received_at|date:"Y-m-d H:i" }}
+                    </td>
+                    <td style="padding: 0.85rem 1rem;">
+                        <span class="provider-badge prov-{{ p.provider }}">
+                            {% if p.provider == "TELEBIRR" %}📶{% elif p.provider == "CBE_BIRR" or p.provider == "CBE_TRANSFER" %}🏦{% else %}💳{% endif %}
+                            {{ p.get_provider_display }}
+                        </span>
+                    </td>
+                    <td style="padding: 0.85rem 1rem;">
+                        <span style="font-family: monospace; font-weight: 800; font-size: 0.95rem; background: hsla(var(--bg-hover) / 0.7); padding: 0.2rem 0.5rem; border-radius: 4px;">
+                            {{ p.transaction_reference }}
+                        </span>
+                    </td>
+                    <td style="padding: 0.85rem 1rem; text-align: right; font-family: monospace; font-weight: 800; font-size: 1.05rem; color: hsl(var(--accent));">
+                        {{ p.amount|floatformat:2 }} ETB
+                    </td>
+                    <td style="padding: 0.85rem 1rem; font-size: 0.88rem;">
+                        <div style="font-weight: 700;">{{ p.payer_name|default:"Mobile Payer" }}</div>
+                        <div style="color: hsl(var(--text-muted)); font-family: monospace;">{{ p.payer_phone|default:"—" }}</div>
+                    </td>
+                    <td style="padding: 0.85rem 1rem; text-align: center;">
+                        <span class="status-pill status-{{ p.status }}">
+                            {{ p.get_status_display }}
+                        </span>
+                    </td>
+                    <td style="padding: 0.85rem 1rem; font-size: 0.88rem;">
+                        {% if p.sale %}
+                        <a href="{% url 'invoice' p.sale.id %}" style="font-weight: 700; color: inherit; text-decoration: underline;">
+                            Sale #{{ p.sale.id }} ({{ p.sale.fs_number }})
+                        </a>
+                        <div style="font-size: 0.78rem; color: hsl(var(--text-muted));">
+                            {{ p.sale.customer.display_name|default:"Walk-in" }} · {{ p.sale.total_amount|floatformat:2 }} ETB
+                        </div>
+                        {% else %}
+                        <span style="color: hsl(var(--text-muted)); font-style: italic;">Unmatched</span>
+                        {% endif %}
+                    </td>
+                    <td style="padding: 0.85rem 1rem; text-align: center;">
+                        {% if not p.sale %}
+                        <button type="button" class="btn btn-secondary btn-sm" onclick="openReconcileModal('{{ p.id }}', '{{ p.transaction_reference }}', '{{ p.amount }}')">
+                            🔗 Reconcile
+                        </button>
+                        {% else %}
+                        <a href="{% url 'invoice' p.sale.id %}" class="btn btn-secondary btn-sm" title="View Invoice">
+                            Receipt
+                        </a>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="8" style="padding: 3rem 1rem; text-align: center; color: hsl(var(--text-muted));">
+                        <div style="font-size: 2rem; margin-bottom: 0.5rem;">📱</div>
+                        <p style="margin: 0; font-weight: 600;">No payment transactions recorded yet.</p>
+                        <p style="margin-top: 0.25rem; font-size: 0.85rem;">Click "Record Mobile Payment / Paste SMS" above to record a Telebirr or CBE Birr receipt.</p>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- ================= MODAL 1: RECORD PAYMENT / PASTE SMS ================= -->
+<div id="payment-modal" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 1000; align-items: center; justify-content: center; padding: 1.5rem;">
+    <div style="background: hsl(var(--card)); max-width: 580px; width: 100%; border-radius: 12px; border: 1px solid hsl(var(--border)); padding: 2rem; box-shadow: 0 10px 25px rgba(0,0,0,0.2);">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem; border-bottom: 1px solid hsl(var(--border)); padding-bottom: 0.75rem;">
+            <h3 style="margin: 0; font-size: 1.15rem; display: flex; align-items: center; gap: 0.5rem;">
+                <span>📱</span> Record Mobile / Bank Payment
+            </h3>
+            <button type="button" onclick="closePaymentModal()" style="background: none; border: none; font-size: 1.4rem; cursor: pointer; color: hsl(var(--text-muted));">✕</button>
+        </div>
+
+        <form method="post" action="{% url 'payment_record' %}">
+            {% csrf_token %}
+            
+            <!-- Paste SMS auto-parser -->
+            <div style="background: hsla(var(--bg-hover) / 0.5); padding: 1rem; border-radius: 8px; border: 1px dashed hsl(var(--border)); margin-bottom: 1.25rem;">
+                <label style="font-size: 0.82rem; font-weight: 700; color: hsl(var(--accent)); display: block; margin-bottom: 0.35rem;">
+                    💡 Fast Auto-Fill: Paste Telebirr / CBE Birr SMS here:
+                </label>
+                <textarea id="raw_sms_input" name="raw_sms" rows="2" class="form-input" placeholder="e.g. You have received ETB 1,850.00 from 0911234567. Transaction ID: CK79812456" oninput="parseSmsLive(this.value)"></textarea>
+                <div style="font-size: 0.75rem; color: hsl(var(--text-muted)); margin-top: 0.25rem;">
+                    The system will automatically extract Reference #, Amount, and Payer Phone.
+                </div>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
+                <div>
+                    <label style="font-size: 0.82rem; font-weight: 600; display: block; margin-bottom: 0.3rem;">Provider</label>
+                    <select id="modal_provider" name="provider" class="form-input">
+                        <option value="TELEBIRR">Telebirr</option>
+                        <option value="CBE_BIRR">CBE Birr</option>
+                        <option value="CBE_TRANSFER">CBE Mobile Banking</option>
+                        <option value="AWASH_BIRR">Awash Birr</option>
+                        <option value="DASHEN_AMOLE">Dashen / Amole</option>
+                        <option value="BANK_OTHER">Other Bank</option>
+                    </select>
+                </div>
+                <div>
+                    <label style="font-size: 0.82rem; font-weight: 600; display: block; margin-bottom: 0.3rem;">Transaction Reference # *</label>
+                    <input type="text" id="modal_ref" name="reference" placeholder="e.g. CK79812456" required class="form-input" style="font-family: monospace; font-weight: 700; text-transform: uppercase;">
+                </div>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
+                <div>
+                    <label style="font-size: 0.82rem; font-weight: 600; display: block; margin-bottom: 0.3rem;">Amount Received (ETB) *</label>
+                    <input type="number" step="0.01" id="modal_amount" name="amount" placeholder="0.00" required class="form-input" style="font-family: monospace; font-weight: 700;">
+                </div>
+                <div>
+                    <label style="font-size: 0.82rem; font-weight: 600; display: block; margin-bottom: 0.3rem;">Payer Phone Number</label>
+                    <input type="text" id="modal_phone" name="payer_phone" placeholder="09..." class="form-input" style="font-family: monospace;">
+                </div>
+            </div>
+
+            <div style="margin-bottom: 1rem;">
+                <label style="font-size: 0.82rem; font-weight: 600; display: block; margin-bottom: 0.3rem;">Link to Sale Invoice (Optional)</label>
+                <select name="sale_id" class="form-input">
+                    <option value="">-- Match Later / Keep as Unmatched --</option>
+                    {% for s in unmatched_sales %}
+                    <option value="{{ s.id }}">
+                        Sale #{{ s.id }} ({{ s.fs_number }}) - {{ s.customer.display_name|default:"Walk-in" }} ({{ s.total_amount|floatformat:2 }} ETB) - {{ s.date|date:"Y-m-d" }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div style="display: flex; justify-content: flex-end; gap: 0.75rem; margin-top: 1.5rem; border-top: 1px solid hsl(var(--border)); padding-top: 1rem;">
+                <button type="button" class="btn btn-secondary" onclick="closePaymentModal()">Cancel</button>
+                <button type="submit" class="btn btn-primary" style="font-weight: 700;">✓ Save Payment</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- ================= MODAL 2: 1-CLICK RECONCILE TO SALE ================= -->
+<div id="reconcile-modal" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 1000; align-items: center; justify-content: center; padding: 1.5rem;">
+    <div style="background: hsl(var(--card)); max-width: 500px; width: 100%; border-radius: 12px; border: 1px solid hsl(var(--border)); padding: 2rem; box-shadow: 0 10px 25px rgba(0,0,0,0.2);">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem; border-bottom: 1px solid hsl(var(--border)); padding-bottom: 0.75rem;">
+            <h3 style="margin: 0; font-size: 1.15rem;">🔗 Reconcile Payment to Sale</h3>
+            <button type="button" onclick="closeReconcileModal()" style="background: none; border: none; font-size: 1.4rem; cursor: pointer; color: hsl(var(--text-muted));">✕</button>
+        </div>
+
+        <form id="reconcile-form" method="post" action="">
+            {% csrf_token %}
+            <div style="margin-bottom: 1rem; background: hsla(var(--bg-hover) / 0.5); padding: 0.75rem 1rem; border-radius: 8px;">
+                <div style="font-size: 0.85rem; color: hsl(var(--text-muted));">Reconciling Transaction:</div>
+                <div style="font-weight: 800; font-family: monospace; font-size: 1.1rem; margin-top: 0.2rem;" id="rec-trans-ref">—</div>
+                <div style="font-weight: 700; color: hsl(var(--accent));" id="rec-trans-amt">— ETB</div>
+            </div>
+
+            <div style="margin-bottom: 1.5rem;">
+                <label style="font-size: 0.85rem; font-weight: 600; display: block; margin-bottom: 0.35rem;">
+                    Select Matching Sale Invoice:
+                </label>
+                <select name="sale_id" required class="form-input">
+                    <option value="">-- Choose Sale Invoice --</option>
+                    {% for s in unmatched_sales %}
+                    <option value="{{ s.id }}">
+                        Sale #{{ s.id }} ({{ s.fs_number }}) - {{ s.customer.display_name|default:"Walk-in" }} ({{ s.total_amount|floatformat:2 }} ETB)
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div style="display: flex; justify-content: flex-end; gap: 0.75rem;">
+                <button type="button" class="btn btn-secondary" onclick="closeReconcileModal()">Cancel</button>
+                <button type="submit" class="btn btn-primary" style="font-weight: 700;">✓ Confirm Reconciliation</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+function openPaymentModal() {
+    document.getElementById('payment-modal').style.display = 'flex';
+}
+function closePaymentModal() {
+    document.getElementById('payment-modal').style.display = 'none';
+}
+
+function openReconcileModal(paymentId, ref, amt) {
+    document.getElementById('reconcile-modal').style.display = 'flex';
+    document.getElementById('rec-trans-ref').textContent = ref;
+    document.getElementById('rec-trans-amt').textContent = parseFloat(amt).toLocaleString('en-US', {minimumFractionDigits: 2}) + ' ETB';
+    document.getElementById('reconcile-form').action = '/sales/payments/' + paymentId + '/reconcile/';
+}
+function closeReconcileModal() {
+    document.getElementById('reconcile-modal').style.display = 'none';
+}
+
+// Client-side instant SMS parser helper
+function parseSmsLive(text) {
+    if (!text) return;
+    const upper = text.toUpperCase();
+    
+    // Provider
+    if (upper.includes("TELEBIRR")) {
+        document.getElementById('modal_provider').value = "TELEBIRR";
+    } else if (upper.includes("CBE BIRR") || upper.includes("CBEBIRR")) {
+        document.getElementById('modal_provider').value = "CBE_BIRR";
+    } else if (upper.includes("COMMERCIAL BANK OF ETHIOPIA") || upper.includes("CBE") || upper.includes("FT")) {
+        document.getElementById('modal_provider').value = "CBE_TRANSFER";
+    } else if (upper.includes("AWASH")) {
+        document.getElementById('modal_provider').value = "AWASH_BIRR";
+    }
+
+    // Amount
+    const amtMatch = text.match(/(?:ETB|BIRR|ብር|AMOUNT)\s*[:.]?\s*([0-9,]+(?:\.[0-9]{1,2})?)/i) || text.match(/([0-9,]+(?:\.[0-9]{1,2})?)\s*(?:ETB|BIRR|ብር)/i);
+    if (amtMatch) {
+        document.getElementById('modal_amount').value = amtMatch[1].replace(/,/g, '');
+    }
+
+    // Reference
+    const refMatch = text.match(/(?:TXN|TRANS(?:ACTION)?(?:\s*ID|\s*NO)?|REF(?:ERENCE)?(?:\s*NO)?)\s*[:.]?\s*([A-Z0-9]{6,25})/i) || text.match(/\b([A-Z]{1,3}[0-9]{6,16})\b/);
+    if (refMatch) {
+        document.getElementById('modal_ref').value = refMatch[1].toUpperCase();
+    }
+
+    // Phone
+    const phoneMatch = text.match(/(?:FROM|CUSTOMER)?\s*(?:[+]?251|0)(9\d{8}|7\d{8})/i);
+    if (phoneMatch) {
+        document.getElementById('modal_phone').value = "0" + phoneMatch[1];
+    }
+}
+</script>
+{% endblock %}

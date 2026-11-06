@@ -1,0 +1,371 @@
+{% extends "base.html" %}
+
+{% block title %}Executive Financial Dashboard - {{ app_name }}{% endblock %}
+
+{% block page_title %}Executive Financial Dashboard{% endblock %}
+
+{% block extra_css %}
+<style>
+.kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 1.25rem;
+    margin-bottom: 2rem;
+}
+.kpi-card {
+    background: hsl(var(--card));
+    border: 1px solid hsl(var(--border));
+    border-radius: var(--radius-lg, 12px);
+    padding: 1.5rem;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    transition: transform 0.15s ease, border-color 0.15s ease;
+}
+.kpi-card:hover {
+    border-color: hsl(var(--accent));
+    transform: translateY(-2px);
+}
+.kpi-title {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: hsl(var(--text-muted));
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+.kpi-value {
+    font-size: 1.75rem;
+    font-weight: 800;
+    margin: 0.75rem 0 0.5rem 0;
+    color: hsl(var(--foreground));
+}
+.kpi-sub {
+    font-size: 0.8rem;
+    color: hsl(var(--text-muted));
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+}
+.growth-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.2rem;
+    padding: 0.15rem 0.45rem;
+    border-radius: 9999px;
+    font-size: 0.75rem;
+    font-weight: 700;
+}
+.growth-pos {
+    background: hsla(142 76% 36% / 0.15);
+    color: #10b981;
+}
+.growth-neg {
+    background: hsla(0 84% 60% / 0.15);
+    color: #ef4444;
+}
+.report-nav-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 1.25rem;
+    margin-top: 1.5rem;
+}
+.report-nav-card {
+    background: hsl(var(--card));
+    border: 1px solid hsl(var(--border));
+    border-radius: var(--radius-lg, 12px);
+    padding: 1.5rem;
+    display: flex;
+    gap: 1.25rem;
+    text-decoration: none;
+    color: inherit;
+    transition: all 0.2s ease;
+}
+.report-nav-card:hover {
+    border-color: hsl(var(--accent));
+    background: hsla(var(--bg-hover) / 0.4);
+    transform: translateY(-2px);
+}
+.report-nav-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: 12px;
+    background: hsla(var(--accent) / 0.12);
+    color: hsl(var(--accent));
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+    flex-shrink: 0;
+}
+.report-nav-content h3 {
+    margin: 0 0 0.35rem 0;
+    font-size: 1.05rem;
+    font-weight: 700;
+}
+.report-nav-content p {
+    margin: 0;
+    font-size: 0.85rem;
+    color: hsl(var(--text-muted));
+    line-height: 1.4;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="header-actions" style="margin-bottom: 1.25rem; display: flex; justify-content: space-between; align-items: center;">
+    <div>
+        <h1 style="margin: 0; font-size: 1.5rem; font-weight: 800;">Financial Reports & Business Intelligence</h1>
+        <p class="text-muted" style="margin: 0.25rem 0 0 0; font-size: 0.9rem;">
+            Real-time accounting analytics for <strong>{{ metrics.profile.name }}</strong> (All figures in ETB).
+        </p>
+    </div>
+    <div style="display: flex; gap: 0.5rem;">
+        <a href="{% url 'reports_settings' %}" class="btn btn-secondary btn-sm" title="Configure Shop Profile & Accounting">⚙️ Settings</a>
+        <a href="{% url 'opening_balance' %}" class="btn btn-secondary btn-sm" title="View or enter baseline balances">🏛️ Opening Balances</a>
+        <a href="{% url 'income_statement' %}?period={{ preset }}" class="btn btn-sm">📄 View P&L Statement</a>
+    </div>
+</div>
+
+<!-- Filter Bar -->
+{% include "reports/_filter_bar.html" %}
+
+<!-- SECTION 1: KEY PERFORMANCE INDICATORS (Executive Metrics) -->
+<div class="kpi-grid">
+    <!-- Net Sales -->
+    <div class="kpi-card" style="border-left: 4px solid #3b82f6;">
+        <div>
+            <div class="kpi-title">
+                <span>Net Sales Revenue</span>
+                <span>🛒</span>
+            </div>
+            <div class="kpi-value">{{ metrics.net_sales|floatformat:2 }} <span style="font-size: 0.9rem; font-weight: 500; color: hsl(var(--text-muted));">ETB</span></div>
+        </div>
+        <div class="kpi-sub">
+            {% if sales_growth is not None %}
+                <span class="growth-badge {% if sales_growth >= 0 %}growth-pos{% else %}growth-neg{% endif %}">
+                    {% if sales_growth >= 0 %}▲ +{% else %}▼ {% endif %}{{ sales_growth }}%
+                </span>
+                <span>vs previous period</span>
+            {% else %}
+                <span>{{ metrics.sales_count }} sales completed</span>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- COGS -->
+    <div class="kpi-card" style="border-left: 4px solid #f59e0b;">
+        <div>
+            <div class="kpi-title">
+                <span>Cost of Goods Sold (COGS)</span>
+                <span>📦</span>
+            </div>
+            <div class="kpi-value">{{ metrics.cogs|floatformat:2 }} <span style="font-size: 0.9rem; font-weight: 500; color: hsl(var(--text-muted));">ETB</span></div>
+        </div>
+        <div class="kpi-sub">
+            <span>Method: {{ metrics.cogs_method }}</span>
+        </div>
+    </div>
+
+    <!-- Gross Profit -->
+    <div class="kpi-card" style="border-left: 4px solid #10b981;">
+        <div>
+            <div class="kpi-title">
+                <span>Gross Profit</span>
+                <span>📈</span>
+            </div>
+            <div class="kpi-value" style="color: #10b981;">{{ metrics.gross_profit|floatformat:2 }} <span style="font-size: 0.9rem; font-weight: 500; color: hsl(var(--text-muted));">ETB</span></div>
+        </div>
+        <div class="kpi-sub">
+            <span class="fw-700" style="color: #10b981;">{{ metrics.gross_margin_percent|floatformat:1 }}% Gross Margin</span>
+        </div>
+    </div>
+
+    <!-- Operating Expenses -->
+    <div class="kpi-card" style="border-left: 4px solid #ef4444;">
+        <div>
+            <div class="kpi-title">
+                <span>Operating Expenses</span>
+                <span>💸</span>
+            </div>
+            <div class="kpi-value">{{ metrics.total_expenses|floatformat:2 }} <span style="font-size: 0.9rem; font-weight: 500; color: hsl(var(--text-muted));">ETB</span></div>
+        </div>
+        <div class="kpi-sub">
+            {% if expenses_growth is not None %}
+                <span class="growth-badge {% if expenses_growth <= 0 %}growth-pos{% else %}growth-neg{% endif %}">
+                    {% if expenses_growth >= 0 %}▲ +{% else %}▼ {% endif %}{{ expenses_growth }}%
+                </span>
+                <span>vs previous period</span>
+            {% else %}
+                <span>Shop overhead & operational costs</span>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Net Profit -->
+    <div class="kpi-card" style="border-left: 4px solid {% if metrics.net_profit >= 0 %}#10b981{% else %}#ef4444{% endif %}; background: hsla({% if metrics.net_profit >= 0 %}142 76% 36%{% else %}0 84% 60%{% endif %} / 0.04);">
+        <div>
+            <div class="kpi-title">
+                <span>Net Profit / (Loss)</span>
+                <span>💰</span>
+            </div>
+            <div class="kpi-value" style="color: {% if metrics.net_profit >= 0 %}#10b981{% else %}#ef4444{% endif %};">
+                {{ metrics.net_profit|floatformat:2 }} <span style="font-size: 0.9rem; font-weight: 500; color: hsl(var(--text-muted));">ETB</span>
+            </div>
+        </div>
+        <div class="kpi-sub">
+            <span class="fw-700" style="color: {% if metrics.net_profit >= 0 %}#10b981{% else %}#ef4444{% endif %};">
+                {{ metrics.net_margin_percent|floatformat:1 }}% Net Margin
+            </span>
+            {% if profit_growth is not None %}
+                <span style="margin-left: 0.5rem; opacity: 0.85;">({% if profit_growth >= 0 %}+{% endif %}{{ profit_growth }}% vs prior)</span>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Purchases -->
+    <div class="kpi-card" style="border-left: 4px solid #8b5cf6;">
+        <div>
+            <div class="kpi-title">
+                <span>Total Purchases</span>
+                <span>🚚</span>
+            </div>
+            <div class="kpi-value">{{ metrics.total_purchases|floatformat:2 }} <span style="font-size: 0.9rem; font-weight: 500; color: hsl(var(--text-muted));">ETB</span></div>
+        </div>
+        <div class="kpi-sub">
+            <span>{{ metrics.purchases_count }} supplier purchase order(s)</span>
+        </div>
+    </div>
+
+    <!-- Inventory Valuation -->
+    <div class="kpi-card" style="border-left: 4px solid #06b6d4;">
+        <div>
+            <div class="kpi-title">
+                <span>Closing Stock Valuation</span>
+                <span>🏢</span>
+            </div>
+            <div class="kpi-value">{{ metrics.closing_inventory_value|floatformat:2 }} <span style="font-size: 0.9rem; font-weight: 500; color: hsl(var(--text-muted));">ETB</span></div>
+        </div>
+        <div class="kpi-sub">
+            <span>Retail value: {{ metrics.closing_inventory_retail|floatformat:2 }} ETB</span>
+        </div>
+    </div>
+
+    <!-- Receivables & Payables -->
+    <div class="kpi-card" style="border-left: 4px solid #f97316;">
+        <div>
+            <div class="kpi-title">
+                <span>Customer Receivables</span>
+                <span>🤝</span>
+            </div>
+            <div class="kpi-value">{{ metrics.total_receivables|floatformat:2 }} <span style="font-size: 0.9rem; font-weight: 500; color: hsl(var(--text-muted));">ETB</span></div>
+        </div>
+        <div class="kpi-sub">
+            <span>Supplier Payables: <strong>{{ metrics.total_payables|floatformat:2 }} ETB</strong></span>
+        </div>
+    </div>
+</div>
+
+<!-- SECTION 2: CRITICAL ALERTS & AUDIT CHECKS -->
+{% if not metrics.has_opening_inventory or metrics.low_stock_count > 0 or metrics.out_of_stock_count > 0 %}
+<div class="card" style="margin-bottom: 2rem; border-left: 4px solid #f59e0b; background: hsla(45 93% 47% / 0.05);">
+    <h3 style="margin: 0 0 0.5rem 0; font-size: 1rem; color: #d97706; display: flex; align-items: center; gap: 0.5rem;">
+        ⚠️ Accounting & Stock Notifications
+    </h3>
+    <ul style="margin: 0; padding-left: 1.25rem; font-size: 0.88rem; color: hsl(var(--foreground)); line-height: 1.6;">
+        {% if not metrics.has_opening_inventory %}
+        <li>
+            <strong>Opening Inventory baseline is not yet recorded for this period.</strong>
+            The system is using perpetual transaction unit costs. To lock in formal periodic accounting,
+            <a href="{% url 'opening_balance' %}" style="text-decoration: underline; font-weight: 700; color: hsl(var(--accent));">record your Opening Balance</a>.
+        </li>
+        {% endif %}
+        {% if metrics.low_stock_count > 0 %}
+        <li>
+            <strong>{{ metrics.low_stock_count }} product(s) are at or below reorder level.</strong>
+            Review items in the <a href="{% url 'product_list' %}?stock=low" style="text-decoration: underline; font-weight: 700; color: hsl(var(--accent));">Low Stock list</a> to replenish fast-moving parts.
+        </li>
+        {% endif %}
+        {% if metrics.out_of_stock_count > 0 %}
+        <li>
+            <strong>{{ metrics.out_of_stock_count }} spare parts currently have 0 quantity on hand.</strong>
+        </li>
+        {% endif %}
+    </ul>
+</div>
+{% endif %}
+
+<!-- SECTION 3: SPECIALIZED FINANCIAL REPORTS DIRECTORY -->
+<div style="margin-top: 1rem;">
+    <h2 style="font-size: 1.25rem; font-weight: 800; margin-bottom: 0.25rem;">Financial Statements & Reports Catalog</h2>
+    <p class="text-muted" style="margin: 0 0 1rem 0; font-size: 0.88rem;">Select a specialized statement to view detailed line items, period trends, and export documents.</p>
+
+    <div class="report-nav-grid">
+        <!-- 1. Income Statement -->
+        <a href="{% url 'income_statement' %}?period={{ preset }}" class="report-nav-card">
+            <div class="report-nav-icon">📊</div>
+            <div class="report-nav-content">
+                <h3>Income Statement (P&L)</h3>
+                <p>Complete profit & loss statement: Gross sales, VAT separation, COGS breakdown, expenses by category, and net profit.</p>
+            </div>
+        </a>
+
+        <!-- 2. Sales Report -->
+        <a href="{% url 'sales_report' %}" class="report-nav-card">
+            <div class="report-nav-icon">🛒</div>
+            <div class="report-nav-content">
+                <h3>Sales & Revenue Report</h3>
+                <p>Sales breakdown by date, customer, payment methods (Cash, Transfer, Telebirr), best-selling parts, and returns.</p>
+            </div>
+        </a>
+
+        <!-- 3. Purchases & Supplier Report -->
+        <a href="{% url 'purchase_list' %}" class="report-nav-card">
+            <div class="report-nav-icon">🚚</div>
+            <div class="report-nav-content">
+                <h3>Purchases & Suppliers</h3>
+                <p>Procurement totals, supplier invoices, weighted-average unit costs, and receiving warehouse logs.</p>
+            </div>
+        </a>
+
+        <!-- 4. Inventory Valuation -->
+        <a href="{% url 'product_list' %}" class="report-nav-card">
+            <div class="report-nav-icon">🏢</div>
+            <div class="report-nav-content">
+                <h3>Inventory Valuation & Stock</h3>
+                <p>Stock valuation at cost and retail, vehicle fitment models, reorder alerts, and physical stock count audit logs.</p>
+            </div>
+        </a>
+
+        <!-- 5. Operating Expenses -->
+        <a href="{% url 'expense_list' %}" class="report-nav-card">
+            <div class="report-nav-icon">💸</div>
+            <div class="report-nav-content">
+                <h3>Operating Expenses</h3>
+                <p>Shop overhead categorised into Rent, Salaries, Utilities, Transport, and Miscellaneous expenses with receipts.</p>
+            </div>
+        </a>
+
+        <!-- 6. Opening Balances -->
+        <a href="{% url 'opening_balance' %}" class="report-nav-card">
+            <div class="report-nav-icon">🏛️</div>
+            <div class="report-nav-content">
+                <h3>Opening Balances & Baselines</h3>
+                <p>Record and lock period opening balances for cash, bank, mobile money, inventory, receivables, and owner capital.</p>
+            </div>
+        </a>
+
+        <!-- 7. Accounting Settings -->
+        <a href="{% url 'reports_settings' %}" class="report-nav-card">
+            <div class="report-nav-icon">⚙️</div>
+            <div class="report-nav-content">
+                <h3>Business Profile & Tax Settings</h3>
+                <p>Configure shop name, Ethiopian Tax Identification Number (TIN), VAT registration (15%), currency, and fiscal year.</p>
+            </div>
+        </a>
+    </div>
+</div>
+{% endblock %}

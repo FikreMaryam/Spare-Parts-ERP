@@ -1,0 +1,125 @@
+{% extends "base.html" %}
+
+{% block title %}Opening Balances & Accounting Baselines - {{ app_name }}{% endblock %}
+
+{% block page_title %}Opening Balances & Accounting Baselines{% endblock %}
+
+{% block content %}
+<div class="header-actions" style="margin-bottom: 1.5rem;">
+    <a href="{% url 'reports_dashboard' %}" class="btn btn-secondary btn-sm">← Back to Reports Hub</a>
+</div>
+
+<div class="row" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(380px, 1fr)); gap: 1.5rem;">
+    <!-- Form Card -->
+    <div class="card" style="padding: 1.75rem;">
+        <h2 style="margin: 0 0 0.5rem 0; font-size: 1.25rem;">Record New Opening Baseline</h2>
+        <p class="text-muted" style="margin: 0 0 1.5rem 0; font-size: 0.85rem;">
+            Anchor your Balance Sheet, Cash Flow, and Periodic COGS to an audited starting point.
+        </p>
+
+        <form method="post">
+            {% csrf_token %}
+
+            <div class="form-group" style="margin-bottom: 1rem;">
+                <label style="font-weight: 600; margin-bottom: 0.35rem; display: block;">Effective Date *</label>
+                <input type="date" name="effective_date" class="form-input" required value="{{ 'now'|date:'Y-m-d' }}" style="width: 100%;">
+                <small class="text-muted">Start of financial year or date accounting begins</small>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
+                <div class="form-group">
+                    <label style="font-weight: 600; font-size: 0.85rem; margin-bottom: 0.25rem; display: block;">Cash on Hand (Till / Safe)</label>
+                    <input type="number" step="0.01" name="opening_cash" value="0.00" class="form-input" style="width: 100%;">
+                </div>
+                <div class="form-group">
+                    <label style="font-weight: 600; font-size: 0.85rem; margin-bottom: 0.25rem; display: block;">Bank Accounts (CBE / Awash)</label>
+                    <input type="number" step="0.01" name="opening_bank" value="0.00" class="form-input" style="width: 100%;">
+                </div>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
+                <div class="form-group">
+                    <label style="font-weight: 600; font-size: 0.85rem; margin-bottom: 0.25rem; display: block;">Mobile Money (Telebirr / CBE Birr)</label>
+                    <input type="number" step="0.01" name="opening_mobile_money" value="0.00" class="form-input" style="width: 100%;">
+                </div>
+                <div class="form-group">
+                    <label style="font-weight: 600; font-size: 0.85rem; margin-bottom: 0.25rem; display: block;">Opening Inventory Value (At Cost)</label>
+                    <input type="number" step="0.01" name="opening_inventory_value" value="0.00" class="form-input" style="width: 100%;">
+                </div>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
+                <div class="form-group">
+                    <label style="font-weight: 600; font-size: 0.85rem; margin-bottom: 0.25rem; display: block;">Customer Receivables (Debts Owed)</label>
+                    <input type="number" step="0.01" name="opening_receivables" value="0.00" class="form-input" style="width: 100%;">
+                </div>
+                <div class="form-group">
+                    <label style="font-weight: 600; font-size: 0.85rem; margin-bottom: 0.25rem; display: block;">Supplier Payables (Bills Owed)</label>
+                    <input type="number" step="0.01" name="opening_payables" value="0.00" class="form-input" style="width: 100%;">
+                </div>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
+                <div class="form-group">
+                    <label style="font-weight: 600; font-size: 0.85rem; margin-bottom: 0.25rem; display: block;">Equipment / Tool Assets</label>
+                    <input type="number" step="0.01" name="opening_equipment_assets" value="0.00" class="form-input" style="width: 100%;">
+                </div>
+                <div class="form-group">
+                    <label style="font-weight: 600; font-size: 0.85rem; margin-bottom: 0.25rem; display: block;">Owner Capital / Invested Equity</label>
+                    <input type="number" step="0.01" name="owner_capital" value="0.00" class="form-input" style="width: 100%;">
+                </div>
+            </div>
+
+            <div class="form-group" style="margin-bottom: 1.25rem;">
+                <label style="font-weight: 600; font-size: 0.85rem; margin-bottom: 0.25rem; display: block;">Audit Notes & Source Records</label>
+                <textarea name="notes" class="form-textarea" rows="2" placeholder="e.g. Verified by physical count and bank statement on Hamle 1." style="width: 100%;"></textarea>
+            </div>
+
+            <button type="submit" class="btn" style="width: 100%;">Save Opening Balance Baseline</button>
+        </form>
+    </div>
+
+    <!-- Existing Baselines List -->
+    <div class="card" style="padding: 1.75rem;">
+        <h2 style="margin: 0 0 0.5rem 0; font-size: 1.25rem;">Audited Baselines History</h2>
+        <p class="text-muted" style="margin: 0 0 1.25rem 0; font-size: 0.85rem;">
+            Historical baseline anchor points recorded in the ERP system.
+        </p>
+
+        {% for b in baselines %}
+        <div style="border: 1px solid hsl(var(--border)); border-radius: 8px; padding: 1.25rem; margin-bottom: 1rem; background: hsla(var(--bg-hover) / 0.2);">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
+                <span style="font-weight: 800; font-size: 1.05rem; color: hsl(var(--accent));">
+                    📅 As of {{ b.effective_date|date:"F d, Y" }}
+                </span>
+                <span style="font-size: 0.75rem; padding: 0.2rem 0.5rem; border-radius: 9999px; background: hsla(142 76% 36% / 0.15); color: #10b981; font-weight: 700;">
+                    Active Baseline
+                </span>
+            </div>
+            
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; font-size: 0.85rem; margin-bottom: 0.75rem;">
+                <div>Cash: <strong>{{ b.opening_cash|floatformat:2 }} ETB</strong></div>
+                <div>Bank: <strong>{{ b.opening_bank|floatformat:2 }} ETB</strong></div>
+                <div>Mobile: <strong>{{ b.opening_mobile_money|floatformat:2 }} ETB</strong></div>
+                <div>Inventory: <strong>{{ b.opening_inventory_value|floatformat:2 }} ETB</strong></div>
+                <div>Receivables: <strong>{{ b.opening_receivables|floatformat:2 }} ETB</strong></div>
+                <div>Payables: <strong>{{ b.opening_payables|floatformat:2 }} ETB</strong></div>
+                <div>Equipment: <strong>{{ b.opening_equipment_assets|floatformat:2 }} ETB</strong></div>
+                <div>Capital: <strong>{{ b.owner_capital|floatformat:2 }} ETB</strong></div>
+            </div>
+
+            {% if b.notes %}
+            <div style="font-size: 0.8rem; color: hsl(var(--text-muted)); font-style: italic; border-top: 1px dashed hsl(var(--border)); padding-top: 0.5rem;">
+                Note: {{ b.notes }}
+            </div>
+            {% endif %}
+        </div>
+        {% empty %}
+        <div class="empty-state" style="padding: 2.5rem 1rem;">
+            <p>No opening balance baselines recorded yet.</p>
+            <small class="text-muted">Use the form on the left to record your opening inventory and cash balances.</small>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}

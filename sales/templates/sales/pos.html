@@ -1,110 +1,546 @@
 {% extends "base.html" %}
 
-{% block title %}Point of Sale - Spare ERP{% endblock %}
+{% block title %}Point of Sale (POS) - {{ app_name }}{% endblock %}
 
-{% block page_title %}Point of Sale{% endblock %}
+{% block page_title %}Point of Sale & Catalog Search{% endblock %}
+
+{% block extra_css %}
+<style>
+.pos-toolbar {
+    background: hsl(var(--bg-card));
+    border: 1px solid hsl(var(--border));
+    border-radius: 12px;
+    padding: 1.25rem;
+    margin-bottom: 1.5rem;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+}
+.scanner-strip {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+    background: hsla(var(--accent) / 0.08);
+    border: 2px dashed hsl(var(--accent));
+    border-radius: 10px;
+    padding: 0.85rem 1.25rem;
+    margin-bottom: 1.25rem;
+}
+.scanner-input {
+    flex: 1;
+    font-size: 1.1rem;
+    font-family: monospace;
+    font-weight: 700;
+    padding: 0.65rem 1rem;
+    border-radius: 8px;
+    border: 1px solid hsl(var(--accent));
+    background: #ffffff;
+    color: #111827;
+}
+.fleet-pill {
+    background: hsla(var(--bg-hover) / 0.8);
+    border: 1px solid hsl(var(--border));
+    border-radius: 20px;
+    padding: 0.35rem 0.85rem;
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    text-decoration: none;
+    color: inherit;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    transition: all 0.15s ease;
+}
+.fleet-pill:hover, .fleet-pill.active {
+    background: hsl(var(--accent));
+    color: #ffffff;
+    border-color: hsl(var(--accent));
+}
+.fit-badge-product {
+    font-size: 0.76rem;
+    font-weight: 800;
+    padding: 0.25rem 0.55rem;
+    border-radius: 6px;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    margin: 0.35rem 0;
+}
+.fit-badge-product.fit-yes {
+    background: #dcfce7;
+    color: #15803d;
+    border: 1px solid #86efac;
+}
+.fit-badge-product.fit-no {
+    background: #fee2e2;
+    color: #991b1b;
+    border: 1px solid #fca5a5;
+    opacity: 0.85;
+}
+.fit-badge-product.fit-sub {
+    background: #e0f2fe;
+    color: #0369a1;
+    border: 1px solid #7dd3fc;
+}
+.cross-ref-tag {
+    background: #fef3c7;
+    color: #b45309;
+    border: 1px solid #fde68a;
+    font-size: 0.75rem;
+    font-weight: 700;
+    padding: 0.2rem 0.5rem;
+    border-radius: 4px;
+    margin: 0.25rem 0;
+    display: inline-block;
+}
+/* Toast notification for scanner */
+#scan-toast {
+    position: fixed;
+    bottom: 2rem;
+    right: 2rem;
+    background: #10b981;
+    color: #ffffff;
+    padding: 1rem 1.5rem;
+    border-radius: 10px;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+    font-weight: 700;
+    font-size: 1rem;
+    display: none;
+    z-index: 9999;
+    align-items: center;
+    gap: 0.75rem;
+}
+</style>
+{% endblock %}
 
 {% block content %}
+<!-- Cart floating button -->
 <div id="cart-popup-trigger" class="btn cart-trigger" title="View Cart">
-    🛒 <span class="cart-count-badge">{{ cart_count|default:0 }}</span>
+    🛒 <span class="cart-count-badge" id="cart-badge-count">{{ cart_count|default:0 }}</span>
 </div>
 
+<!-- Cart popup preview -->
 <div id="cart-popup" class="cart-popup">
-    <h3 class="mb-4">Your Cart</h3>
+    <h3 class="mb-4">Your Shopping Cart</h3>
     {% if cart_items %}
-    <div style="max-height: 400px; overflow-y: auto; margin-bottom: 1.5rem;">
+    <div style="max-height: 380px; overflow-y: auto; margin-bottom: 1.5rem;">
         {% for item in cart_items %}
         <div class="cart-item">
             <div class="cart-item-info">
                 <span class="cart-item-name">{{ item.product.name }}</span>
-                <span class="cart-item-qty">Qty: {{ item.quantity }}</span>
+                <span class="cart-item-qty">Qty: {{ item.quantity }} {{ item.product.uom_short }}</span>
             </div>
-            <div class="cart-item-price">${{ item.get_total|floatformat:2 }}</div>
+            <div class="cart-item-price" style="font-family: monospace; font-weight: 700;">{{ item.get_total|floatformat:2 }} ETB</div>
         </div>
         {% endfor %}
     </div>
-    <a href="{% url 'cart' %}" class="btn" style="width: 100%;">Checkout Now</a>
+    <a href="{% url 'cart' %}" class="btn btn-primary" style="width: 100%; font-weight: 700;">Proceed to Checkout →</a>
     {% else %}
     <div class="empty-state" style="padding: 2rem 0;">
-        <p>Your cart is empty</p>
+        <p>Your cart is empty.</p>
     </div>
     {% endif %}
 </div>
 
-<div class="card">
-    <form method="get" class="pos-search-bar">
-        <div class="form-group" style="flex: 1; min-width: 300px; margin-bottom: 0;">
-            <label>Product Search</label>
-            <input type="text" name="q" placeholder="Search by part #, oem, brand, car model..." value="{{ request.GET.q }}">
+<!-- ================= 1. FAST BARCODE & SKU SCANNING TOOLBAR ================= -->
+<div class="scanner-strip">
+    <div style="font-size: 1.8rem;">📷</div>
+    <div style="flex: 1;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.3rem;">
+            <label style="font-size: 0.85rem; font-weight: 700; color: hsl(var(--accent)); text-transform: uppercase; letter-spacing: 0.04em;">
+                Barcode & SKU Instant Scanner (ባርኮድ መቃኛ)
+            </label>
+            <span style="font-size: 0.78rem; color: hsl(var(--text-muted)); font-weight: 600;">
+                Shortcut: Press <kbd style="background: hsla(var(--bg-hover) / 0.8); border: 1px solid hsl(var(--border)); padding: 0.15rem 0.4rem; border-radius: 4px;">F2</kbd> or point scanner gun
+            </span>
         </div>
-        <div class="form-group" style="min-width: 150px; margin-bottom: 0;">
-            <label>Pricing Model</label>
-            <select name="price_type">
-                <option value="retail" {% if request.GET.price_type != 'wholesale' %}selected{% endif %}>Retail</option>
-                <option value="wholesale" {% if request.GET.price_type == 'wholesale' %}selected{% endif %}>Wholesale</option>
-            </select>
-        </div>
-        <button type="submit" class="btn">Search</button>
-    </form>
+        <form id="barcode-scan-form" onsubmit="handleBarcodeScan(event)" style="display: flex; gap: 0.5rem;">
+            <input type="text" id="barcode-input" placeholder="Scan barcode or type SKU / OEM number and press Enter..." class="scanner-input" autocomplete="off">
+            <button type="submit" class="btn btn-primary" style="font-weight: 700; white-space: nowrap; padding: 0 1.25rem;">
+                + Scan to Cart
+            </button>
+        </form>
+    </div>
 </div>
 
-{% if errors %}
-<div class="card badge-error" style="border-radius: var(--radius-md); padding: 1rem 2rem;">
-    <ul style="margin: 0; padding-left: 1.2rem;">
-        {% for error in errors %}
-        <li>{{ error }}</li>
-        {% endfor %}
-    </ul>
+<!-- Scanner Toast Alert -->
+<div id="scan-toast">
+    <span id="scan-toast-icon">✓</span>
+    <span id="scan-toast-msg">Item added to cart!</span>
 </div>
-{% endif %}
 
-<div class="card">
-    <form method="post" id="sale-form">
-        {% csrf_token %}
-        <p class="text-muted mb-4">Select a product to begin a sale or add it to your cart.</p>
-        
-        <div class="product-grid">
-            {% for p in products %}
-            <div class="product-card">
-                <div>
-                    <h3>{{ p.name }}</h3>
-                    <p>Part #: <span>{{ p.part_number|default:'—' }}</span></p>
-                    <p>Brand: <span>{{ p.brand|default:'—' }}</span></p>
-                    <p>In Stock: <span>{{ p.quantity }}</span></p>
-                </div>
-                <div style="margin-top: 1.5rem; display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem;">
-                    <a href="{% url 'pos_single' p.id %}" class="btn">Sell Now</a>
-                    <a href="{% url 'add_to_cart' p.id %}" class="btn btn-secondary">Add Cart</a>
-                </div>
-            </div>
-            {% empty %}
-            <div class="empty-state" style="grid-column: 1 / -1;">
-                <p>No products match your search. Try broadening your criteria.</p>
-            </div>
+<!-- ================= 2. VEHICLE FITMENT & CUSTOMER GARAGE FLEET TOOLBAR ================= -->
+<div class="pos-toolbar">
+    <!-- Regular Customer & Garage Selection -->
+    <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.75rem; border-bottom: 1px solid hsl(var(--border)); padding-bottom: 0.85rem; margin-bottom: 1rem;">
+        <div style="display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap;">
+            <label style="font-weight: 700; font-size: 0.88rem; margin: 0; display: flex; align-items: center; gap: 0.35rem;">
+                <span>🏢</span> Garage / Customer:
+            </label>
+            <form method="get" id="customer-select-form" style="display: inline-block; margin: 0;">
+                <select name="customer" class="form-input" style="min-width: 240px; padding: 0.4rem 0.75rem;" onchange="this.form.submit()">
+                    <option value="">-- Walk-in / Select Garage Account --</option>
+                    {% for c in all_customers %}
+                    <option value="{{ c.id }}" {% if active_customer.id == c.id %}selected{% endif %}>
+                        {{ c.display_name }} ({{ c.vehicles.count }} vehicles)
+                    </option>
+                    {% endfor %}
+                </select>
+                {% if request.GET.q %}<input type="hidden" name="q" value="{{ request.GET.q }}">{% endif %}
+            </form>
+            {% if active_customer %}
+            <a href="{% url 'customer_detail' active_customer.id %}" style="font-size: 0.82rem; color: hsl(var(--accent)); font-weight: 600; text-decoration: underline;">
+                Manage Fleet / Profile →
+            </a>
+            {% endif %}
+        </div>
+        <div style="display: flex; gap: 0.5rem;">
+            <a href="{% url 'payment_list' %}" class="btn btn-secondary btn-sm" title="Electronic Payment Tracking">
+                📱 Mobile Payments
+            </a>
+            <a href="{% url 'cart' %}" class="btn btn-primary btn-sm">
+                Checkout ({{ cart_count }})
+            </a>
+        </div>
+    </div>
+
+    <!-- Saved Fleet Pills for Selected Customer -->
+    {% if customer_vehicles %}
+    <div style="margin-bottom: 1rem; background: hsla(var(--bg-hover) / 0.4); padding: 0.75rem 1rem; border-radius: 8px;">
+        <div style="font-size: 0.82rem; font-weight: 700; margin-bottom: 0.45rem; color: hsl(var(--text-muted));">
+            🚘 Saved Fleet for {{ active_customer.display_name }}: (Click vehicle to filter matching parts)
+        </div>
+        <div style="display: flex; flex-wrap: wrap; gap: 0.5rem;">
+            {% for v in customer_vehicles %}
+            <a href="{% url 'pos' %}?customer={{ active_customer.id }}&vehicle={{ v.id }}{% if v.car_model %}&carmodel={{ v.car_model.id }}&make={{ v.car_model.make_id }}{% endif %}{% if v.vin_number %}&vin={{ v.vin_number }}{% endif %}"
+               class="fleet-pill {% if active_vehicle.id == v.id %}active{% endif %}">
+                🚗 {{ v.display_title }}
+                {% if v.vin_number %}<span style="opacity: 0.75; font-family: monospace; font-size: 0.75rem;">[{{ v.vin_number }}]</span>{% endif %}
+            </a>
             {% endfor %}
         </div>
+    </div>
+    {% endif %}
 
-        <div style="margin-top: 3rem; padding-top: 2rem; border-top: 1px solid hsl(var(--border)); display: flex; align-items: center; justify-content: space-between;">
-            <div style="display: flex; align-items: center; gap: 1rem;">
-                <label style="margin: 0;">Active Pricing:</label>
-                <select id="price-type-select" name="price_type" form="sale-form" style="width: auto;">
-                    <option value="retail" {% if request.GET.price_type != 'wholesale' %}selected{% endif %}>Retail</option>
-                    <option value="wholesale" {% if request.GET.price_type == 'wholesale' %}selected{% endif %}>Wholesale</option>
-                </select>
-            </div>
-            <div style="text-align: right;">
-                <div style="font-size: 0.9rem; color: hsl(var(--text-muted));">Estimated totals for this session</div>
-                <div style="font-size: 1.5rem; margin-top: 0.5rem;">
-                    <span class="fw-800">Total: <span id="grand-total" style="color: hsl(var(--accent));">$0.00</span></span>
-                    &nbsp;&nbsp;
-                    <span class="fw-700" style="font-size: 1.1rem; opacity: 0.8;">Profit: <span id="grand-profit" style="color: hsl(var(--success));">$0.00</span></span>
-                </div>
-            </div>
+    <!-- Filter Form -->
+    <form method="get" class="pos-search-bar" style="display: flex; flex-wrap: wrap; gap: 0.85rem; align-items: flex-end;">
+        {% if active_customer %}<input type="hidden" name="customer" value="{{ active_customer.id }}">{% endif %}
+        {% if active_vehicle %}<input type="hidden" name="vehicle" value="{{ active_vehicle.id }}">{% endif %}
+
+        <div style="flex: 2; min-width: 220px;">
+            <label style="font-size: 0.82rem; font-weight: 600; margin-bottom: 0.3rem; display: block;">Search Spare Part</label>
+            <input type="text" name="q" placeholder="Part #, OEM code, brand, alternate code, name..." value="{{ search_query }}" class="form-input">
+        </div>
+
+        <div style="flex: 1.3; min-width: 180px;">
+            <label style="font-size: 0.82rem; font-weight: 600; margin-bottom: 0.3rem; display: block;">
+                VIN / Chassis Code (ቪን ወይም ሻንሲ)
+            </label>
+            <input type="text" name="vin" placeholder="e.g. JTDKN..., KUN25, NZE141" value="{{ vin_query }}" class="form-input" style="font-family: monospace; font-weight: 700; text-transform: uppercase;">
+        </div>
+
+        <div style="flex: 1.1; min-width: 150px;">
+            <label style="font-size: 0.82rem; font-weight: 600; margin-bottom: 0.3rem; display: block;">Car Make</label>
+            <select name="make" id="pos-make" onchange="onPosMakeChanged(this.value)" class="form-input">
+                <option value="">All Makes ({{ car_makes.count }})</option>
+                {% for m in car_makes %}
+                <option value="{{ m.id }}" {% if filter_make == m.id|stringformat:"s" %}selected{% endif %}>{{ m.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div style="flex: 1.3; min-width: 180px;">
+            <label style="font-size: 0.82rem; font-weight: 600; margin-bottom: 0.3rem; display: block;">Model Fitment</label>
+            <select name="carmodel" id="pos-carmodel" class="form-input">
+                <option value="">All Models</option>
+                {% for m in car_makes %}
+                    {% for mod in m.models.all %}
+                    <option value="{{ mod.id }}"
+                            data-make-id="{{ m.id }}"
+                            {% if filter_model == mod.id|stringformat:"s" %}selected{% endif %}
+                            {% if filter_make and filter_make != m.id|stringformat:"s" %}style="display:none;"{% endif %}>
+                        {{ m.name }} {{ mod.name }} ({{ mod.year_from|default:'' }}–{{ mod.year_to|default:'Present' }})
+                    </option>
+                    {% endfor %}
+                {% endfor %}
+            </select>
+        </div>
+
+        <div style="display: flex; gap: 0.5rem;">
+            <button type="submit" class="btn btn-primary" style="font-weight: 700;">Filter</button>
+            {% if search_query or vin_query or filter_make or filter_model or active_vehicle %}
+            <a href="{% url 'pos' %}{% if active_customer %}?customer={{ active_customer.id }}{% endif %}" class="btn btn-secondary">Clear</a>
+            {% endif %}
         </div>
     </form>
+
+    <!-- Active Vehicle or VIN Indicator Banner -->
+    {% if vin_query or active_make or active_model or active_vehicle %}
+    <div style="margin-top: 0.85rem; padding: 0.55rem 0.95rem; background: #ecfdf5; border: 1px solid #10b981; border-radius: 8px; font-size: 0.88rem; color: #065f46; font-weight: 600; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem;">
+        <div style="display: flex; align-items: center; gap: 0.5rem;">
+            <span>🚗</span>
+            <span>
+                Active Vehicle Target:
+                {% if active_vehicle %}<strong>[{{ active_vehicle.plate_number }}]</strong>{% endif %}
+                {% if active_make %}{{ active_make.name }}{% endif %}
+                {% if active_model %} {{ active_model.name }}{% endif %}
+                {% if vin_query %}(VIN/Chassis: <code style="font-weight: 800;">{{ vin_query }}</code>){% endif %}
+            </span>
+        </div>
+        <span style="font-size: 0.8rem; background: #10b981; color: white; padding: 0.15rem 0.5rem; border-radius: 4px;">
+            Fitment Verified
+        </span>
+    </div>
+    {% endif %}
+</div>
+
+<!-- ================= 3. SPARE PARTS PRODUCT GRID ================= -->
+<div class="card" style="padding: 1.5rem;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem;">
+        <h3 style="margin: 0; font-size: 1.15rem;">Spare Parts Catalog ({{ products|length }} items)</h3>
+        <span style="font-size: 0.85rem; color: hsl(var(--text-muted));">All prices include 15% VAT</span>
+    </div>
+
+    <div class="product-grid">
+        {% for p in products %}
+        <div class="product-card" style="display: flex; flex-direction: column; justify-content: space-between;">
+            <div>
+                <div class="product-card-img-wrap">
+                    {% if p.image %}
+                    <img src="{{ p.image.url }}" alt="{{ p.name }}" class="product-card-img">
+                    {% else %}
+                    <div class="product-card-img-placeholder">⚙️</div>
+                    {% endif %}
+                </div>
+
+                <h3 style="font-size: 1.05rem; margin-top: 0.75rem;">
+                    <a href="{% url 'product_detail' p.id %}{% if vin_query %}?vin={{ vin_query }}{% endif %}" style="text-decoration: none; color: inherit;">
+                        {{ p.name }}
+                    </a>
+                </h3>
+
+                <!-- Cross Reference match tag if triggered -->
+                {% if p.match_badge %}
+                <span class="cross-ref-tag">{{ p.match_badge }}</span>
+                {% endif %}
+
+                <!-- Live Fitment Badge -->
+                {% if p.fits_vehicle == True %}
+                <div class="fit-badge-product fit-yes" title="{{ p.fit_detail }}">
+                    <span>✓</span> {{ p.fit_badge_text|default:"EXACT FIT GUARANTEED / ተስማሚ ዕቃ" }}
+                </div>
+                {% elif p.fits_vehicle == False %}
+                <div class="fit-badge-product fit-no" title="{{ p.fit_detail }}">
+                    <span>⚠️</span> DOES NOT FIT ACTIVE VEHICLE
+                </div>
+                {% endif %}
+
+                <p style="margin: 0.2rem 0; font-size: 0.88rem;">
+                    OEM Part #: <span style="font-family: monospace; font-weight: 700;">{{ p.part_number|default:'—' }}</span>
+                </p>
+                <p style="margin: 0.2rem 0; font-size: 0.88rem;">
+                    SKU: <span style="font-family: monospace;">{{ p.sku|default:'—' }}</span> · Brand: <span style="font-weight: 600; color: hsl(var(--accent));">{{ p.brand|default:'—' }}</span>
+                </p>
+                <p style="margin: 0.2rem 0; font-size: 0.88rem;">
+                    Stock: 
+                    <span style="font-weight: 800; {% if p.quantity <= 0 %}color: #ef4444;{% elif p.is_low_stock %}color: #f59e0b;{% else %}color: #10b981;{% endif %}">
+                        {{ p.quantity }} {{ p.uom_short }} ({{ p.uom_amharic }})
+                    </span>
+                    {% if p.shelf_bin %} · <span style="font-size: 0.75rem; color: hsl(var(--text-muted)); font-family: monospace;">Bin: {{ p.shelf_bin }}</span>{% endif %}
+                </p>
+
+                <!-- Vehicle Application preview -->
+                {% if p.compatibilities.exists %}
+                <p style="font-size: 0.8rem; margin: 0.25rem 0; color: hsl(var(--accent)); font-weight: 600;" title="{% for cm in p.compatibilities.all %}{{ cm }}{% if not forloop.last %}, &#10;{% endif %}{% endfor %}">
+                    🚗 {{ p.compatibilities.first }}{% if p.compatibilities.count > 1 %} <span style="opacity: 0.85; font-size: 0.75rem;">(+{{ p.compatibilities.count|add:"-1" }} models)</span>{% endif %}
+                </p>
+                {% elif p.vehicle_application %}
+                <p style="font-size: 0.8rem; margin: 0.25rem 0; color: hsl(var(--text-muted));">
+                    🚗 {{ p.vehicle_application|truncatechars:35 }}
+                </p>
+                {% endif %}
+
+                <p style="margin-top: 0.5rem; font-size: 1.15rem; font-weight: 800; color: hsl(var(--accent)); font-family: monospace;">
+                    {{ p.selling_price|floatformat:2 }} ETB
+                </p>
+            </div>
+
+            <div style="margin-top: 1.25rem; display: grid; grid-template-columns: 1fr 1fr; gap: 0.65rem;">
+                <a href="{% url 'pos_single' p.id %}" class="btn btn-secondary btn-sm" style="text-align: center;">Sell Single</a>
+                <a href="{% url 'add_to_cart' p.id %}" class="btn btn-primary btn-sm" style="text-align: center;">+ Add Cart</a>
+                <button type="button" class="btn btn-primary btn-sm" onclick="quickAddToCart('{{ p.id }}')" style="display:none;">+ Add Cart</button>
+            </div>
+        </div>
+        {% empty %}
+        <div class="empty-state" style="grid-column: 1 / -1; padding: 3rem 1rem;">
+            <div style="font-size: 2.5rem; margin-bottom: 0.5rem;">🔍</div>
+            <h3>No spare parts matched your search</h3>
+            <p style="color: hsl(var(--text-muted));">Try searching by OEM number, alternate code, or reset the vehicle filter.</p>
+            <a href="{% url 'pos' %}" class="btn btn-secondary" style="margin-top: 0.75rem;">Show All Parts</a>
+        </div>
+        {% endfor %}
+    </div>
 </div>
 
 <script>
+// Web Audio API feedback tones (no external audio files needed!)
+const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+function playBeep(success) {
+    if (audioCtx.state === 'suspended') {
+        audioCtx.resume();
+    }
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+
+    if (success) {
+        osc.frequency.setValueAtTime(1200, audioCtx.currentTime);
+        osc.frequency.setValueAtTime(1800, audioCtx.currentTime + 0.08);
+        gain.gain.setValueAtTime(0.15, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.16);
+        osc.start();
+        osc.stop(audioCtx.currentTime + 0.16);
+    } else {
+        osc.frequency.setValueAtTime(320, audioCtx.currentTime);
+        gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.25);
+        osc.start();
+        osc.stop(audioCtx.currentTime + 0.25);
+    }
+}
+
+function showToast(msg, isSuccess) {
+    const toast = document.getElementById('scan-toast');
+    const msgElem = document.getElementById('scan-toast-msg');
+    const iconElem = document.getElementById('scan-toast-icon');
+    if (!toast) return;
+
+    toast.style.background = isSuccess ? '#10b981' : '#ef4444';
+    iconElem.textContent = isSuccess ? '✓' : '⚠️';
+    msgElem.textContent = msg;
+    toast.style.display = 'flex';
+
+    setTimeout(() => {
+        toast.style.display = 'none';
+    }, 2800);
+}
+
+// Quick Add to Cart via AJAX
+function quickAddToCart(productId) {
+    fetch('/sales/cart/add/' + productId + '/', {
+        headers: { 'X-Requested-With': 'XMLHttpRequest' }
+    })
+    .then(() => {
+        playBeep(true);
+        const badge = document.getElementById('cart-badge-count');
+        if (badge) {
+            badge.textContent = parseInt(badge.textContent || 0) + 1;
+        }
+        showToast('✓ Part added to cart!', true);
+    })
+    .catch(() => {
+        window.location.href = '/sales/cart/add/' + productId + '/';
+    });
+}
+
+// Handle Barcode Scanner Input (form submit or Enter)
+function handleBarcodeScan(e) {
+    e.preventDefault();
+    const input = document.getElementById('barcode-input');
+    const code = (input.value || '').trim();
+    if (!code) return;
+
+    fetch('/sales/scan-barcode/?code=' + encodeURIComponent(code))
+    .then(res => res.json())
+    .then(data => {
+        if (data.success) {
+            playBeep(true);
+            const badge = document.getElementById('cart-badge-count');
+            if (badge) badge.textContent = data.cart_count;
+            showToast('✓ Scanned ' + data.product.name + ' (Qty: ' + data.product.cart_quantity + ' ' + data.product.unit + ')', true);
+            input.value = '';
+            input.focus();
+        } else {
+            playBeep(false);
+            showToast('⚠️ ' + (data.error || 'Barcode not found'), false);
+            input.select();
+        }
+    })
+    .catch(err => {
+        playBeep(false);
+        showToast('Network error while scanning barcode', false);
+    });
+}
+
+// Global Hardware Barcode Scanner Listener
+// Handheld USB/Bluetooth barcode guns fire keys under 40ms ending with Enter
+let scanBuffer = '';
+let lastKeyTime = Date.now();
+
+document.addEventListener('keydown', function(e) {
+    // Keyboard shortcut F2 focuses the barcode input
+    if (e.key === 'F2') {
+        e.preventDefault();
+        const input = document.getElementById('barcode-input');
+        if (input) input.focus();
+        return;
+    }
+
+    const currentTime = Date.now();
+    const timeDiff = currentTime - lastKeyTime;
+    lastKeyTime = currentTime;
+
+    // Ignore if user is typing into other inputs like search or textarea
+    const activeTag = document.activeElement ? document.activeElement.tagName.toLowerCase() : '';
+    if (activeTag === 'input' && document.activeElement.id !== 'barcode-input') {
+        return;
+    }
+    if (activeTag === 'textarea' || activeTag === 'select') {
+        return;
+    }
+
+    if (e.key === 'Enter') {
+        if (scanBuffer.length >= 3 && timeDiff < 150) {
+            // Rapid keystrokes detected -> barcode scanner gun!
+            e.preventDefault();
+            const scannedCode = scanBuffer;
+            scanBuffer = '';
+            const input = document.getElementById('barcode-input');
+            if (input) input.value = scannedCode;
+            handleBarcodeScan(e);
+        }
+        scanBuffer = '';
+    } else if (e.key.length === 1) {
+        if (timeDiff > 200) {
+            scanBuffer = '';
+        }
+        scanBuffer += e.key;
+    }
+});
+
+function onPosMakeChanged(selectedMakeId) {
+    const modelSelect = document.getElementById('pos-carmodel');
+    if (!modelSelect) return;
+    const options = modelSelect.querySelectorAll('option');
+    let hasCurrentModel = false;
+    options.forEach(opt => {
+        if (!opt.value) {
+            opt.style.display = '';
+            return;
+        }
+        const makeId = opt.getAttribute('data-make-id');
+        if (!selectedMakeId || makeId === selectedMakeId) {
+            opt.style.display = '';
+            if (opt.selected) hasCurrentModel = true;
+        } else {
+            opt.style.display = 'none';
+        }
+    });
+    if (!hasCurrentModel && modelSelect.value !== '') {
+        modelSelect.value = '';
+    }
+}
+
 document.addEventListener('DOMContentLoaded', function() {
     var trigger = document.getElementById('cart-popup-trigger');
     var popup = document.getElementById('cart-popup');

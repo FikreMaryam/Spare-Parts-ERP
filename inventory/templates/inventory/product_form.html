@@ -1,0 +1,958 @@
+{% extends "base.html" %}
+
+{% block title %}
+{% if object %}Edit {{ object.name|default:"Product" }}{% else %}Add New Spare Part{% endif %} - {{ app_name }}
+{% endblock %}
+
+{% block page_title %}
+{% if object %}Edit Spare Part{% else %}Add New Spare Part{% endif %}
+{% endblock %}
+
+{% block extra_css %}
+<style>
+/* Layout */
+.product-form-container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding-bottom: 5rem;
+}
+.form-header-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.5rem;
+    flex-wrap: wrap;
+    gap: 1rem;
+}
+.form-section-card {
+    padding: 2rem;
+    margin-bottom: 1.75rem;
+    border-radius: var(--radius-lg, 12px);
+    border: 1px solid hsl(var(--border));
+    background: hsl(var(--card));
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+}
+.section-header h2 {
+    margin: 0 0 0.35rem 0;
+    font-size: 1.25rem;
+    color: hsl(var(--foreground));
+    font-weight: 700;
+}
+
+/* Grids */
+.form-grid-2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1.25rem; margin-bottom: 1.25rem; }
+.form-grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.25rem; margin-bottom: 1.25rem; }
+.form-grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1.25rem; margin-bottom: 1.25rem; }
+.full-span-2 { grid-column: span 2; }
+@media (max-width: 860px) {
+    .form-grid-2, .form-grid-3, .form-grid-4 { grid-template-columns: 1fr; }
+    .full-span-2 { grid-column: span 1; }
+}
+
+/* Form Controls */
+.form-group { display: flex; flex-direction: column; }
+.form-group label, .dropdown-field-label {
+    font-weight: 600;
+    font-size: 0.88rem;
+    margin-bottom: 0.4rem;
+    color: hsl(var(--foreground));
+}
+.form-input, .form-select, .form-textarea, input[type="text"], input[type="number"], select, textarea {
+    width: 100%;
+    padding: 0.65rem 0.9rem;
+    background: hsl(var(--bg));
+    border: 1px solid hsl(var(--border));
+    border-radius: var(--radius-md, 8px);
+    color: hsl(var(--foreground));
+    font-size: 0.92rem;
+    transition: border-color 0.15s, box-shadow 0.15s;
+}
+.form-input:focus, .form-select:focus, .form-textarea:focus {
+    outline: none;
+    border-color: hsl(var(--accent));
+    box-shadow: 0 0 0 3px hsla(var(--accent) / 0.15);
+}
+.field-error { color: #ef4444; font-size: 0.8rem; margin-top: 0.35rem; font-weight: 500; }
+
+/* Selected Badge */
+.selected-badge {
+    background: hsla(var(--accent) / 0.15);
+    color: hsl(var(--accent));
+    border: 1px solid hsla(var(--accent) / 0.3);
+    padding: 0.35rem 0.85rem;
+    border-radius: 20px;
+    font-size: 0.85rem;
+    font-weight: 700;
+}
+
+/* Smart Chassis Quick Detect Bar */
+.chassis-quick-detect-bar {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.75rem 1rem;
+    background: hsla(var(--accent) / 0.05);
+    border: 1px dashed hsla(var(--accent) / 0.35);
+    border-radius: 8px;
+    margin-bottom: 1.25rem;
+    flex-wrap: wrap;
+}
+.quick-detect-icon {
+    font-size: 1.25rem;
+}
+#chassisQuickInput {
+    padding: 0.5rem 0.85rem;
+    font-size: 0.88rem;
+    border-radius: 6px;
+    background: hsl(var(--card));
+    flex: 1;
+    min-width: 250px;
+}
+
+/* IN-FLOW Expandable Vehicle Selection (NO OVERLAPPING!) */
+.fitment-picker-container {
+    width: 100%;
+    border: 1px solid hsl(var(--border));
+    border-radius: 10px;
+    background: hsl(var(--bg));
+    overflow: hidden;
+}
+.fitment-trigger-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.85rem 1.25rem;
+    background: hsla(var(--bg-hover) / 0.6);
+    cursor: pointer;
+    user-select: none;
+    border-bottom: 1px solid transparent;
+    transition: background 0.15s;
+}
+.fitment-trigger-bar:hover {
+    background: hsla(var(--bg-hover) / 0.9);
+}
+.fitment-trigger-bar.expanded {
+    border-bottom-color: hsl(var(--border));
+}
+.trigger-info {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    flex: 1;
+    flex-wrap: wrap;
+}
+.trigger-tags-preview {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+    max-height: 70px;
+    overflow-y: auto;
+}
+.selected-tag-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    background: hsla(var(--accent) / 0.15);
+    color: hsl(var(--accent));
+    border: 1px solid hsla(var(--accent) / 0.3);
+    padding: 0.15rem 0.5rem;
+    border-radius: 12px;
+    font-size: 0.78rem;
+    font-weight: 600;
+}
+.tag-remove-x {
+    cursor: pointer;
+    font-size: 0.8rem;
+    font-weight: bold;
+    color: hsl(var(--accent));
+}
+.tag-remove-x:hover {
+    color: #ef4444;
+}
+.trigger-toggle-btn {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: hsl(var(--accent));
+    white-space: nowrap;
+}
+
+/* In-Flow Picker Panel (Pushes content down, CANNOT overlap footer) */
+.fitment-picker-panel {
+    display: none;
+    padding: 1rem 1.25rem;
+    background: hsl(var(--card));
+}
+.fitment-search-bar {
+    display: flex;
+    gap: 0.75rem;
+    align-items: center;
+    margin-bottom: 1rem;
+    flex-wrap: wrap;
+}
+.fitment-search-input {
+    flex: 1;
+    min-width: 250px;
+    padding: 0.6rem 0.85rem;
+    border-radius: 8px;
+    font-size: 0.9rem;
+}
+.fitment-action-btns {
+    display: flex;
+    gap: 0.4rem;
+    flex-wrap: wrap;
+}
+.btn-tiny {
+    padding: 0.35rem 0.65rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    border-radius: 6px;
+    border: 1px solid hsl(var(--border));
+    background: hsl(var(--bg));
+    color: hsl(var(--foreground));
+    cursor: pointer;
+}
+.btn-tiny:hover {
+    border-color: hsl(var(--accent));
+    color: hsl(var(--accent));
+}
+
+/* Presets */
+.fitment-presets-row {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.6rem 0;
+    margin-bottom: 1rem;
+    border-bottom: 1px dashed hsl(var(--border));
+    overflow-x: auto;
+    white-space: nowrap;
+}
+.preset-pill {
+    background: hsla(var(--accent) / 0.08);
+    border: 1px solid hsla(var(--accent) / 0.2);
+    color: hsl(var(--foreground));
+    padding: 0.25rem 0.55rem;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+.preset-pill:hover {
+    background: hsl(var(--accent));
+    color: #fff;
+}
+
+/* Scrollable Brands and Models List */
+.fitment-scroll-area {
+    max-height: 480px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+    padding-right: 0.5rem;
+}
+.brand-accordion {
+    border: 1px solid hsl(var(--border));
+    border-radius: 8px;
+    background: hsl(var(--bg));
+    overflow: hidden;
+}
+.brand-header-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.65rem 1rem;
+    background: hsla(var(--bg-hover) / 0.5);
+    cursor: pointer;
+    user-select: none;
+}
+.brand-header-row:hover {
+    background: hsla(var(--bg-hover) / 0.9);
+}
+.brand-title {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+.brand-arrow {
+    font-size: 0.7rem;
+    color: hsl(var(--text-muted));
+    transition: transform 0.2s ease;
+    width: 12px;
+}
+.brand-arrow.open {
+    transform: rotate(90deg);
+}
+.brand-name-text {
+    font-size: 0.92rem;
+    font-weight: 700;
+    color: hsl(var(--foreground));
+}
+.brand-count-badge {
+    background: hsla(var(--text-muted) / 0.15);
+    color: hsl(var(--text-muted));
+    font-size: 0.72rem;
+    font-weight: 600;
+    padding: 0.15rem 0.45rem;
+    border-radius: 8px;
+}
+.brand-selected-pill {
+    background: hsl(var(--accent));
+    color: #fff;
+    font-size: 0.7rem;
+    font-weight: 700;
+    padding: 0.15rem 0.45rem;
+    border-radius: 8px;
+}
+.brand-select-all-label {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: hsl(var(--text-muted));
+    cursor: pointer;
+}
+
+/* Models Grid */
+.models-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 0.5rem;
+    padding: 0.75rem 1rem;
+    border-top: 1px solid hsl(var(--border));
+    background: hsl(var(--card));
+}
+.model-tick-card {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.6rem;
+    padding: 0.5rem 0.75rem;
+    border: 1px solid hsl(var(--border));
+    border-radius: 6px;
+    background: hsl(var(--bg));
+    cursor: pointer;
+    transition: all 0.15s;
+}
+.model-tick-card:hover {
+    border-color: hsl(var(--accent));
+    background: hsla(var(--accent) / 0.04);
+}
+.model-tick-cb {
+    margin-top: 0.2rem;
+    accent-color: hsl(var(--accent));
+    width: 17px;
+    height: 17px;
+    cursor: pointer;
+    flex-shrink: 0;
+}
+.model-meta {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+    flex: 1;
+}
+.model-title-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 0.35rem;
+}
+.model-name {
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: hsl(var(--foreground));
+}
+.model-years {
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: hsl(var(--accent));
+    background: hsla(var(--accent) / 0.1);
+    padding: 0.1rem 0.35rem;
+    border-radius: 4px;
+    white-space: nowrap;
+}
+.model-sub-text {
+    font-size: 0.73rem;
+    color: hsl(var(--text-muted));
+    font-family: monospace;
+}
+
+/* Fitment Footer */
+.fitment-panel-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.85rem 1.25rem;
+    background: hsla(var(--bg-hover) / 0.4);
+    border-top: 1px solid hsl(var(--border));
+    margin-top: 0.75rem;
+    border-radius: 0 0 8px 8px;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+}
+
+/* Submit Actions Footer */
+.form-actions-footer {
+    display: flex;
+    align-items: center;
+    gap: 1.25rem;
+    margin-top: 2.5rem;
+    padding-top: 1.75rem;
+    border-top: 1px solid hsl(var(--border));
+}
+.btn-lg {
+    padding: 0.85rem 2.25rem;
+    font-size: 1rem;
+    font-weight: 700;
+    border-radius: 8px;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="product-form-container">
+    
+    <!-- Top Action Bar (Save from top or bottom without scrolling!) -->
+    <div class="form-header-bar">
+        <div>
+            <a href="{% url 'product_list' %}" class="btn btn-secondary btn-sm">← Back to Inventory Items</a>
+        </div>
+        <div style="display: flex; gap: 0.75rem;">
+            <a href="{% url 'product_list' %}" class="btn btn-secondary">Cancel</a>
+            <button type="submit" form="productForm" class="btn btn-primary" style="font-weight: 700;">
+                ✓ {% if object %}Save Changes{% else %}Create Spare Part{% endif %}
+            </button>
+        </div>
+    </div>
+
+    <form method="post" enctype="multipart/form-data" id="productForm">
+        {% csrf_token %}
+        
+        {% if form.non_field_errors %}
+            <div class="alert-box error-alert" style="margin-bottom: 1.5rem; padding: 1rem; border-radius: 8px; background: #fee2e2; color: #b91c1c;">
+                {{ form.non_field_errors }}
+            </div>
+        {% endif %}
+
+        <!-- Part Details Card -->
+        <div class="card form-section-card">
+            <div class="section-header" style="margin-bottom: 1.5rem;">
+                <h2>1. Part & Inventory Information</h2>
+                <p class="text-muted" style="margin: 0; font-size: 0.85rem;">Enter the product details, stock levels, and storage locations.</p>
+            </div>
+
+            <div class="form-grid-3">
+                <div class="form-group">
+                    <label for="{{ form.part_number.id_for_label }}">Part Number (OEM / Main) *</label>
+                    {{ form.part_number }}
+                    {% if form.part_number.errors %}<span class="field-error">{{ form.part_number.errors|striptags }}</span>{% endif %}
+                </div>
+                <div class="form-group">
+                    <label for="{{ form.sku.id_for_label }}">SKU / Internal Code</label>
+                    {{ form.sku }}
+                    {% if form.sku.errors %}<span class="field-error">{{ form.sku.errors|striptags }}</span>{% endif %}
+                </div>
+                <div class="form-group">
+                    <label for="{{ form.category.id_for_label }}">Category</label>
+                    {{ form.category }}
+                    {% if form.category.errors %}<span class="field-error">{{ form.category.errors|striptags }}</span>{% endif %}
+                </div>
+            </div>
+
+            <div class="form-grid-3">
+                <div class="form-group full-span-2">
+                    <label for="{{ form.name.id_for_label }}">Part Name / Description *</label>
+                    {{ form.name }}
+                    {% if form.name.errors %}<span class="field-error">{{ form.name.errors|striptags }}</span>{% endif %}
+                </div>
+                <div class="form-group">
+                    <label for="{{ form.brand.id_for_label }}">Brand (e.g. Toyota, Denso, Bosch)</label>
+                    {{ form.brand }}
+                    {% if form.brand.errors %}<span class="field-error">{{ form.brand.errors|striptags }}</span>{% endif %}
+                </div>
+            </div>
+
+            <div class="form-grid-3">
+                <div class="form-group">
+                    <label for="{{ form.manufacturer_brand.id_for_label }}">Manufacturer / Origin</label>
+                    {{ form.manufacturer_brand }}
+                </div>
+                <div class="form-group">
+                    <label for="{{ form.alternate_numbers.id_for_label }}">Alternate / Cross-Ref Part Numbers</label>
+                    {{ form.alternate_numbers }}
+                    <small class="text-muted" style="font-size: 0.75rem; margin-top: 0.2rem;">Comma-separated cross-references</small>
+                </div>
+                <div class="form-group" style="display: flex; align-items: center; gap: 0.75rem; padding-top: 1.5rem;">
+                    <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; font-weight: 600;">
+                        {{ form.is_genuine }}
+                        <span>Genuine OEM Part</span>
+                    </label>
+                </div>
+            </div>
+
+            <div class="form-grid-4">
+                <div class="form-group">
+                    <label for="{{ form.cost_price.id_for_label }}">Cost Price (ETB) *</label>
+                    {{ form.cost_price }}
+                </div>
+                <div class="form-group">
+                    <label for="{{ form.selling_price.id_for_label }}">Retail Selling Price (ETB) *</label>
+                    {{ form.selling_price }}
+                </div>
+                <div class="form-group">
+                    <label for="{{ form.wholesale_price.id_for_label }}">Wholesale Price (ETB)</label>
+                    {{ form.wholesale_price }}
+                </div>
+                <div class="form-group">
+                    <label for="{{ form.quantity.id_for_label }}">Initial Stock Quantity</label>
+                    {{ form.quantity }}
+                </div>
+            </div>
+
+            <div class="form-grid-4">
+                <div class="form-group">
+                    <label for="{{ form.unit_of_measure.id_for_label }}">Unit of Measure (መለኪያ)</label>
+                    {{ form.unit_of_measure }}
+                </div>
+                <div class="form-group">
+                    <label for="{{ form.reorder_level.id_for_label }}">Reorder Alert Level</label>
+                    {{ form.reorder_level }}
+                </div>
+                <div class="form-group">
+                    <label for="{{ form.location.id_for_label }}">Storage Aisle / Location</label>
+                    {{ form.location }}
+                </div>
+                <div class="form-group">
+                    <label for="{{ form.shelf_bin.id_for_label }}">Shelf / Bin Code</label>
+                    {{ form.shelf_bin }}
+                </div>
+            </div>
+
+            <div class="form-grid-2">
+                <div class="form-group">
+                    <label for="{{ form.purpose.id_for_label }}">Part Purpose / Function</label>
+                    {{ form.purpose }}
+                </div>
+                <div class="form-group">
+                    <label for="{{ form.vehicle_application.id_for_label }}">Vehicle Application Summary (Text Notes)</label>
+                    {{ form.vehicle_application }}
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="{{ form.image.id_for_label }}">Part Photo / Diagram Image</label>
+                {{ form.image }}
+            </div>
+        </div>
+
+        <!-- Section 2: Vehicle Compatibilities (IN-FLOW, IMPOSSIBLE TO OVERLAP BUTTONS!) -->
+        <div class="card form-section-card">
+            <div class="section-header" style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 1rem; margin-bottom: 1.25rem;">
+                <div>
+                    <h2>2. Vehicle Compatibilities (Multi-Model Fitment)</h2>
+                    <p class="text-muted" style="margin: 0; font-size: 0.85rem;">
+                        One part can fit multiple vehicles. Expand the vehicle picker below to tick all models this spare part fits.
+                    </p>
+                </div>
+                <div class="selected-badge" id="selectedBadge">
+                    <span id="selectedCount">0</span> vehicles selected
+                </div>
+            </div>
+
+            <!-- Smart Feature: Chassis / VIN Auto-Tick Tool -->
+            <div class="chassis-quick-detect-bar">
+                <div class="quick-detect-icon">⚡</div>
+                <input type="text" id="chassisQuickInput" placeholder="Quick-Tick by Chassis/VIN prefix (e.g. ZRE152, KUN26, GUN126, Y62, FC1, D-Max)..." onkeydown="if(event.key==='Enter'){event.preventDefault();quickTickByChassis();}">
+                <button type="button" class="btn btn-secondary btn-sm" onclick="quickTickByChassis()">Auto-Tick Matching Cars</button>
+            </div>
+
+            <!-- In-Flow Fitment Picker Component -->
+            <div class="fitment-picker-container" id="fitmentPickerRoot">
+                
+                <!-- Trigger Bar (Click to toggle expansion) -->
+                <div class="fitment-trigger-bar" id="fitmentTriggerBar" onclick="toggleFitmentPanel()">
+                    <div class="trigger-info">
+                        <span style="font-size: 1.25rem;">🚗</span>
+                        <div class="trigger-tags-preview" id="triggerTagsContainer">
+                            <span style="color: hsl(var(--text-muted)); font-size: 0.9rem;" id="triggerPlaceholder">Click here to open vehicle models picker...</span>
+                        </div>
+                    </div>
+                    <div class="trigger-toggle-btn" id="triggerToggleBtn">
+                        <span id="triggerActionText">Expand Picker ▼</span>
+                    </div>
+                </div>
+
+                <!-- Expanding In-Flow Panel (Naturally expands card, ZERO overlap with buttons below!) -->
+                <div class="fitment-picker-panel" id="fitmentPickerPanel">
+                    
+                    <!-- Search & Quick Action Buttons -->
+                    <div class="fitment-search-bar">
+                        <input type="text" id="fitmentSearchInput" class="form-input fitment-search-input" placeholder="🔍 Search vehicles by make, model, chassis, or engine code..." oninput="filterFitmentList()">
+                        <div class="fitment-action-btns">
+                            <button type="button" class="btn-tiny" onclick="expandAllBrands()">Expand All Brands</button>
+                            <button type="button" class="btn-tiny" onclick="collapseAllBrands()">Collapse All</button>
+                            <button type="button" class="btn-tiny" style="color: #ef4444;" onclick="clearAllFitment()">Clear All</button>
+                        </div>
+                    </div>
+
+                    <!-- Fleet Presets -->
+                    <div class="fitment-presets-row">
+                        <span style="font-size: 0.78rem; font-weight: 700; color: hsl(var(--text-muted)); margin-right: 0.25rem;">Quick Presets:</span>
+                        <button type="button" class="preset-pill" onclick="applyPreset('Corolla')">+ All Corolla</button>
+                        <button type="button" class="preset-pill" onclick="applyPreset('Hilux')">+ All Hilux</button>
+                        <button type="button" class="preset-pill" onclick="applyPreset('Land Cruiser')">+ All Land Cruiser / Prado</button>
+                        <button type="button" class="preset-pill" onclick="applyPreset('Patrol')">+ All Nissan Patrol</button>
+                        <button type="button" class="preset-pill" onclick="applyPreset('D-Max')">+ All Isuzu D-Max</button>
+                        <button type="button" class="preset-pill" onclick="applyPreset('Civic')">+ All Honda Civic</button>
+                        <button type="button" class="preset-pill" onclick="applyPreset('Tucson')">+ All Hyundai Tucson</button>
+                        <button type="button" class="preset-pill" onclick="applyPreset('Ranger')">+ All Ford Ranger</button>
+                    </div>
+
+                    <!-- Scrollable Brands & Models List -->
+                    <div class="fitment-scroll-area" id="fitmentScrollArea">
+                        {% for make in car_makes %}
+                        <div class="brand-accordion" data-brand="{{ make.name|lower }}" id="brand-group-{{ make.id }}">
+                            
+                            <!-- Brand Header Row -->
+                            <div class="brand-header-row" onclick="toggleBrandAccordion('models-list-{{ make.id }}', 'brand-arrow-{{ make.id }}')">
+                                <div class="brand-title">
+                                    <span class="brand-arrow" id="brand-arrow-{{ make.id }}">▶</span>
+                                    <span class="brand-name-text">{{ make.name }}</span>
+                                    <span class="brand-count-badge">{{ make.models.count }} models</span>
+                                    <span class="brand-selected-pill" id="brand-pill-{{ make.id }}" style="display: none;">0</span>
+                                </div>
+                                <div onclick="event.stopPropagation()">
+                                    <label class="brand-select-all-label">
+                                        <input type="checkbox" class="brand-all-cb" data-target="models-list-{{ make.id }}" onchange="handleBrandSelectAll(this)">
+                                        <span>Select All {{ make.name }}</span>
+                                    </label>
+                                </div>
+                            </div>
+
+                            <!-- Models List under this Brand -->
+                            <div class="models-grid" id="models-list-{{ make.id }}" style="display: none;">
+                                {% for cm in make.models.all %}
+                                <label class="model-tick-card" data-search="{{ make.name|lower }} {{ cm.name|lower }} {{ cm.chassis_prefixes|lower }} {{ cm.engine_type|lower }} {{ cm.year_from }} {{ cm.year_to }}">
+                                    <input type="checkbox" name="compatibilities" value="{{ cm.id }}"
+                                           class="model-tick-cb"
+                                           data-display-name="{{ make.name }} {{ cm.name }} ({{ cm.year_from }}–{{ cm.year_to|default:'Present' }})"
+                                           data-make-id="{{ make.id }}"
+                                           {% if cm.id in selected_compatibilities %}checked{% endif %}
+                                           onchange="onModelTickChanged()">
+                                    <div class="model-meta">
+                                        <div class="model-title-row">
+                                            <span class="model-name">{{ cm.name }}</span>
+                                            <span class="model-years">
+                                                {% if cm.year_from and cm.year_to %}{{ cm.year_from }}–{{ cm.year_to }}{% else %}{{ cm.year_from }}+{% endif %}
+                                            </span>
+                                        </div>
+                                        <div class="model-sub-text">
+                                            {% if cm.chassis_prefixes %}
+                                            <span>Chassis: {{ cm.chassis_prefixes }}</span>
+                                            {% endif %}
+                                            {% if cm.engine_type %}
+                                            <span>· {{ cm.engine_type }}</span>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                </label>
+                                {% empty %}
+                                <div class="text-muted text-xs" style="padding: 0.5rem 1rem;">No models configured for {{ make.name }}.</div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                        {% empty %}
+                        <div class="text-muted text-center" style="padding: 2rem;">No vehicle makes available.</div>
+                        {% endfor %}
+                    </div>
+
+                    <!-- Panel Footer -->
+                    <div class="fitment-panel-footer">
+                        <span style="font-weight: 700; font-size: 0.88rem;" id="fitmentFooterCount">0 vehicles selected</span>
+                        <div style="display: flex; gap: 0.75rem;">
+                            <button type="button" class="btn btn-secondary btn-sm" onclick="toggleFitmentPanel()">Collapse Picker ▲</button>
+                            <button type="submit" form="productForm" class="btn btn-primary btn-sm" style="font-weight: 700;">✓ Save Product Now</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Submit & Actions Footer (Cleanly positioned below, IMPOSSIBLE TO BE OVERLAPPED!) -->
+        <div class="form-actions-footer">
+            <button type="submit" class="btn btn-primary btn-lg" style="min-width: 240px;">
+                ✓ {% if object %}Save Changes{% else %}Create Spare Part{% endif %}
+            </button>
+            <a href="{% url 'product_list' %}" class="btn btn-secondary btn-lg">Cancel</a>
+        </div>
+    </form>
+</div>
+
+<script>
+// Toggle in-flow fitment picker panel
+function toggleFitmentPanel() {
+    const panel = document.getElementById('fitmentPickerPanel');
+    const bar = document.getElementById('fitmentTriggerBar');
+    const actionText = document.getElementById('triggerActionText');
+
+    if (panel.style.display === 'none' || panel.style.display === '') {
+        panel.style.display = 'block';
+        bar.classList.add('expanded');
+        actionText.textContent = 'Collapse Picker ▲';
+        setTimeout(() => {
+            const searchInput = document.getElementById('fitmentSearchInput');
+            if (searchInput) searchInput.focus();
+        }, 50);
+    } else {
+        panel.style.display = 'none';
+        bar.classList.remove('expanded');
+        actionText.textContent = 'Expand Picker ▼';
+    }
+}
+
+// Toggle individual brand accordion
+function toggleBrandAccordion(bodyId, arrowId) {
+    const body = document.getElementById(bodyId);
+    const arrow = document.getElementById(arrowId);
+    if (!body || !arrow) return;
+
+    if (body.style.display === 'none' || body.style.display === '') {
+        body.style.display = 'grid';
+        arrow.classList.add('open');
+    } else {
+        body.style.display = 'none';
+        arrow.classList.remove('open');
+    }
+}
+
+// Expand All Brands
+function expandAllBrands() {
+    document.querySelectorAll('.models-grid').forEach(g => g.style.display = 'grid');
+    document.querySelectorAll('.brand-arrow').forEach(a => a.classList.add('open'));
+}
+
+// Collapse All Brands
+function collapseAllBrands() {
+    document.querySelectorAll('.models-grid').forEach(g => g.style.display = 'none');
+    document.querySelectorAll('.brand-arrow').forEach(a => a.classList.remove('open'));
+}
+
+// Select All for brand
+function handleBrandSelectAll(cb) {
+    const targetBodyId = cb.getAttribute('data-target');
+    const body = document.getElementById(targetBodyId);
+    if (!body) return;
+
+    body.style.display = 'grid';
+    const arrowId = targetBodyId.replace('models-list-', 'brand-arrow-');
+    const arrow = document.getElementById(arrowId);
+    if (arrow) arrow.classList.add('open');
+
+    body.querySelectorAll('.model-tick-cb').forEach(box => {
+        box.checked = cb.checked;
+    });
+
+    updateFitmentState();
+}
+
+function onModelTickChanged() {
+    updateFitmentState();
+}
+
+function clearAllFitment() {
+    if (confirm("Deselect all vehicle compatibilities?")) {
+        document.querySelectorAll('.model-tick-cb').forEach(cb => cb.checked = false);
+        document.querySelectorAll('.brand-all-cb').forEach(cb => cb.checked = false);
+        updateFitmentState();
+    }
+}
+
+// Quick Preset Applicator
+function applyPreset(keyword) {
+    const kw = keyword.toLowerCase();
+    document.querySelectorAll('.model-tick-card').forEach(card => {
+        const searchData = (card.getAttribute('data-search') || '').toLowerCase();
+        if (searchData.includes(kw)) {
+            const cb = card.querySelector('.model-tick-cb');
+            if (cb) cb.checked = true;
+
+            const parentGrid = card.closest('.models-grid');
+            if (parentGrid) {
+                parentGrid.style.display = 'grid';
+                const arrowId = parentGrid.id.replace('models-list-', 'brand-arrow-');
+                const arrow = document.getElementById(arrowId);
+                if (arrow) arrow.classList.add('open');
+            }
+        }
+    });
+    updateFitmentState();
+}
+
+// Quick-Tick by Chassis/VIN prefix
+function quickTickByChassis() {
+    const input = document.getElementById('chassisQuickInput');
+    if (!input) return;
+    const query = input.value.trim().toLowerCase();
+    if (!query) {
+        alert("Please enter a chassis code or VIN prefix (e.g. ZRE152, KUN26, GUN126, Y62).");
+        return;
+    }
+
+    let matches = 0;
+    document.querySelectorAll('.model-tick-card').forEach(card => {
+        const searchData = (card.getAttribute('data-search') || '').toLowerCase();
+        if (searchData.includes(query)) {
+            const cb = card.querySelector('.model-tick-cb');
+            if (cb) {
+                cb.checked = true;
+                matches++;
+            }
+            const parentGrid = card.closest('.models-grid');
+            if (parentGrid) {
+                parentGrid.style.display = 'grid';
+                const arrowId = parentGrid.id.replace('models-list-', 'brand-arrow-');
+                const arrow = document.getElementById(arrowId);
+                if (arrow) arrow.classList.add('open');
+            }
+        }
+    });
+
+    if (matches > 0) {
+        // Open panel so user sees matched vehicles
+        const panel = document.getElementById('fitmentPickerPanel');
+        if (panel && panel.style.display !== 'block') {
+            toggleFitmentPanel();
+        }
+        alert(`Found and checked ${matches} vehicle models matching '${input.value.trim()}'.`);
+        input.value = '';
+        updateFitmentState();
+    } else {
+        alert(`No vehicle models found matching chassis code '${input.value.trim()}'.`);
+    }
+}
+
+// Live Filter within picker
+function filterFitmentList() {
+    const query = (document.getElementById('fitmentSearchInput').value || '').trim().toLowerCase();
+    const brandAccordions = document.querySelectorAll('.brand-accordion');
+
+    if (!query) {
+        brandAccordions.forEach(acc => {
+            acc.style.display = '';
+            acc.querySelectorAll('.model-tick-card').forEach(card => card.style.display = '');
+        });
+        return;
+    }
+
+    brandAccordions.forEach(acc => {
+        let hasMatchInBrand = false;
+        const brandName = (acc.getAttribute('data-brand') || '').toLowerCase();
+        const matchesBrandDirectly = brandName.includes(query);
+
+        acc.querySelectorAll('.model-tick-card').forEach(card => {
+            const searchData = (card.getAttribute('data-search') || '').toLowerCase();
+            if (matchesBrandDirectly || searchData.includes(query)) {
+                card.style.display = '';
+                hasMatchInBrand = true;
+            } else {
+                card.style.display = 'none';
+            }
+        });
+
+        if (hasMatchInBrand) {
+            acc.style.display = '';
+            const grid = acc.querySelector('.models-grid');
+            if (grid) grid.style.display = 'grid';
+            const arrow = acc.querySelector('.brand-arrow');
+            if (arrow) arrow.classList.add('open');
+        } else {
+            acc.style.display = 'none';
+        }
+    });
+}
+
+// Update badges, chips, and counts
+function updateFitmentState() {
+    const checkedBoxes = Array.from(document.querySelectorAll('.model-tick-cb:checked'));
+    const totalCount = checkedBoxes.length;
+
+    // Update count labels
+    const selectedCountEl = document.getElementById('selectedCount');
+    if (selectedCountEl) selectedCountEl.textContent = totalCount;
+    
+    const footerCountEl = document.getElementById('fitmentFooterCount');
+    if (footerCountEl) footerCountEl.textContent = `${totalCount} vehicles selected`;
+
+    // Update tags preview in trigger bar
+    const tagsContainer = document.getElementById('triggerTagsContainer');
+    const placeholder = document.getElementById('triggerPlaceholder');
+
+    if (totalCount === 0) {
+        if (placeholder) placeholder.style.display = 'inline';
+        if (tagsContainer) {
+            tagsContainer.innerHTML = '<span style="color: hsl(var(--text-muted)); font-size: 0.9rem;" id="triggerPlaceholder">Click here to open vehicle models picker...</span>';
+        }
+    } else {
+        if (tagsContainer) {
+            let html = '';
+            // Show up to 4 preview tags
+            checkedBoxes.slice(0, 4).forEach(cb => {
+                const name = cb.getAttribute('data-display-name') || 'Model';
+                const val = cb.value;
+                html += `<span class="selected-tag-chip">${name} <span class="tag-remove-x" onclick="event.stopPropagation(); removeFitmentModel('${val}')">&times;</span></span>`;
+            });
+            if (totalCount > 4) {
+                html += `<span class="selected-tag-chip" style="background: hsla(var(--bg-hover) / 0.8); color: hsl(var(--text-muted));">+${totalCount - 4} more</span>`;
+            }
+            tagsContainer.innerHTML = html;
+        }
+    }
+
+    // Update brand pills
+    const brandCounts = {};
+    checkedBoxes.forEach(cb => {
+        const makeId = cb.getAttribute('data-make-id');
+        brandCounts[makeId] = (brandCounts[makeId] || 0) + 1;
+    });
+
+    document.querySelectorAll('.brand-accordion').forEach(acc => {
+        const makeId = acc.id.replace('brand-group-', '');
+        const pill = document.getElementById(`brand-pill-${makeId}`);
+        const brandAllCb = acc.querySelector('.brand-all-cb');
+        const count = brandCounts[makeId] || 0;
+
+        if (pill) {
+            if (count > 0) {
+                pill.textContent = count;
+                pill.style.display = 'inline-block';
+            } else {
+                pill.style.display = 'none';
+            }
+        }
+
+        const totalInBrand = acc.querySelectorAll('.model-tick-cb').length;
+        if (brandAllCb) {
+            brandAllCb.checked = (count > 0 && count === totalInBrand);
+        }
+    });
+}
+
+function removeFitmentModel(modelId) {
+    const cb = document.querySelector(`.model-tick-cb[value="${modelId}"]`);
+    if (cb) {
+        cb.checked = false;
+        updateFitmentState();
+    }
+}
+
+// Initialize on page load
+document.addEventListener('DOMContentLoaded', function() {
+    updateFitmentState();
+});
+</script>
+{% endblock %}

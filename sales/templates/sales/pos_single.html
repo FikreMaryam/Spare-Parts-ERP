@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Sell {{ product.name }} - ERP My Shop{% endblock %}
+{% block title %}Sell {{ product.name }} - {{ app_name }}{% endblock %}
 
 {% block extra_css %}
 <style>
@@ -46,11 +46,18 @@ h1 a.btn { margin-right:0.5rem; }
 <div class="card">
     <form method="post" id="single-form">
         {% csrf_token %}
-        <div class="product-header">
-            <h2>{{ product.name }}</h2>
-            <p>Part #: {{ product.part_number|default:'—' }}</p>
-            <p>Brand: {{ product.brand|default:'—' }}</p>
-            <p>Stock: {{ product.quantity }}</p>
+        <div class="product-header" style="display: flex; gap: 1.5rem; align-items: center;">
+            {% if product.image %}
+            <img src="{{ product.image.url }}" alt="{{ product.name }}" style="width: 90px; height: 90px; object-fit: cover; border-radius: 8px; border: 1px solid hsl(var(--border));">
+            {% else %}
+            <div style="width: 90px; height: 90px; background: hsla(var(--bg) / 0.5); border: 1px solid hsl(var(--border)); border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 2rem;">⚙️</div>
+            {% endif %}
+            <div>
+                <h2 style="margin: 0 0 0.3rem;">{{ product.name }}</h2>
+                <p style="margin: 0.15rem 0;">Part #: <strong>{{ product.part_number|default:'—' }}</strong></p>
+                <p style="margin: 0.15rem 0;">Brand: <strong>{{ product.brand|default:'—' }}</strong></p>
+                <p style="margin: 0.15rem 0;">Available Stock: <strong>{{ product.quantity }}</strong></p>
+            </div>
         </div>
         <div class="sale-form">
             <p>

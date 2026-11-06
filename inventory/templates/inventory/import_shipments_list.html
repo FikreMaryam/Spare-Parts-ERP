@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+
+{% block title %}Import Materials & Landed Cost (የውጭ ዕቃዎች ማስገቢያ) - {{ app_name }}{% endblock %}
+
+{% block page_title %}International Materials Import & Landed Cost Management{% endblock %}
+
+{% block content %}
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 1rem;">
+    <div>
+        <p style="margin: 0; color: hsl(var(--text-muted)); font-size: 0.95rem;">
+            Plan and manage container and air cargo shipments from China, Dubai, Turkey, and Europe with Ethiopian customs tariffs and landed unit costing.
+        </p>
+    </div>
+    <div style="display: flex; gap: 0.6rem; align-items: center;">
+        <a href="{% url 'import_shipment_create' %}" class="btn" style="background: #0f766e; color: #ffffff; font-weight: 700; display: inline-flex; align-items: center; gap: 0.4rem;">
+            <span>🚢</span> New Import Shipment & Landed Costing (አዲስ የውጭ ዕቃ)
+        </a>
+    </div>
+</div>
+
+<div class="card" style="padding: 0; overflow: hidden;">
+    <div class="table-container">
+        <table class="sortable-table">
+            <thead>
+                <tr>
+                    <th style="padding-left: 1.5rem;">Shipment #</th>
+                    <th>Title & Description</th>
+                    <th>Origin Country</th>
+                    <th>Ports (Departure → Arrival)</th>
+                    <th>Receiving Shop/Store</th>
+                    <th>FOB Total</th>
+                    <th style="text-align: right;">Total Landed Cost (ETB)</th>
+                    <th style="text-align: center;">Status</th>
+                    <th style="text-align: right; padding-right: 1.5rem;">Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for s in shipments %}
+                <tr>
+                    <td style="padding-left: 1.5rem; font-family: monospace; font-weight: 800;">
+                        <a href="{% url 'import_shipment_detail' s.id %}" style="color: #0f766e; text-decoration: none;">
+                            {{ s.shipment_number }}
+                        </a>
+                    </td>
+                    <td>
+                        <strong>{{ s.title }}</strong>
+                        {% if s.supplier %}<div style="font-size: 0.78rem; color: hsl(var(--text-muted));">Supplier: {{ s.supplier.name }}</div>{% endif %}
+                    </td>
+                    <td>
+                        <span class="badge" style="background: hsla(var(--accent) / 0.1); color: hsl(var(--accent)); font-weight: 700;">
+                            🌍 {{ s.origin_country }}
+                        </span>
+                    </td>
+                    <td style="font-size: 0.85rem; color: hsl(var(--text-muted));">
+                        {{ s.departure_port|default:"Origin Port" }} → <strong>{{ s.arrival_port }}</strong>
+                    </td>
+                    <td>{{ s.destination_warehouse.name|default:"Main Store" }}</td>
+                    <td style="font-family: monospace; font-weight: 600;">
+                        {{ s.total_fob_foreign_currency|floatformat:2 }} {{ s.currency }}
+                        <div style="font-size: 0.75rem; color: hsl(var(--text-muted));">@ {{ s.exchange_rate }} ETB</div>
+                    </td>
+                    <td style="text-align: right; font-weight: 800; font-family: monospace; color: #0f766e; font-size: 1.05rem;">
+                        {{ s.total_shipment_landed_cost_etb|floatformat:2 }} ETB
+                    </td>
+                    <td style="text-align: center;">
+                        {% if s.status == 'ARRIVED' %}
+                        <span class="badge badge-ok">✓ Received in Store</span>
+                        {% elif s.status == 'TRANSIT' %}
+                        <span class="badge" style="background: #e0f2fe; color: #0369a1;">🚢 In Transit</span>
+                        {% elif s.status == 'CUSTOMS' %}
+                        <span class="badge" style="background: #fef3c7; color: #92400e;">🛃 At Customs</span>
+                        {% else %}
+                        <span class="badge badge-secondary">{{ s.status }}</span>
+                        {% endif %}
+                    </td>
+                    <td style="text-align: right; padding-right: 1.5rem; white-space: nowrap;">
+                        <a href="{% url 'import_shipment_detail' s.id %}" class="btn btn-secondary btn-sm" title="View Landed Cost Sheet">
+                            📊 Landed Cost Sheet
+                        </a>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="9" style="text-align: center; padding: 4rem 1rem; color: hsl(var(--text-muted));">
+                        <div style="font-size: 2.5rem; margin-bottom: 0.5rem;">🚢</div>
+                        <p style="font-size: 1.05rem; font-weight: 600; margin: 0 0 0.5rem 0;">No Import Shipments Recorded</p>
+                        <p style="margin: 0 0 1.25rem 0; font-size: 0.9rem;">Start recording your container or air shipments with customs tariffs and landed unit costing.</p>
+                        <a href="{% url 'import_shipment_create' %}" class="btn btn-primary">➕ Plan First Import Shipment</a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

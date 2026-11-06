@@ -1,0 +1,325 @@
+{% extends "base.html" %}
+
+{% block title %}Create Proforma Invoice (አዲስ የዋጋ ማቅረቢያ ፕሮፎርማ) - {{ app_name }}{% endblock %}
+
+{% block page_title %}Create Official Proforma Invoice (ፕሮፎርማ ማዘጋጃ){% endblock %}
+
+{% block content %}
+<div class="header-actions" style="margin-bottom: 1.25rem;">
+    <a href="{% url 'proforma_list' %}" class="btn btn-secondary btn-sm">← Back to Proformas List</a>
+</div>
+
+<form method="post" id="proforma-form">
+    {% csrf_token %}
+
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 1.5rem; margin-bottom: 1.5rem;">
+        <!-- Buyer Information Card -->
+        <div class="card">
+            <h3 style="font-size: 1.05rem; margin-top: 0; margin-bottom: 1rem; color: #0f766e; display: flex; align-items: center; gap: 0.5rem;">
+                <span>🏢</span> Buyer & Customer Details (የገዢው መረጃ)
+            </h3>
+
+            <div style="margin-bottom: 0.85rem;">
+                <label style="font-size: 0.82rem; font-weight: 600; display: block; margin-bottom: 0.25rem;">Select Existing Customer (optional):</label>
+                <select id="cust-select" name="customer_id" class="form-select" style="width: 100%;">
+                    <option value="">-- Choose Existing Customer or Enter Below --</option>
+                    {% for c in customers %}
+                        <option value="{{ c.id }}" data-phone="{{ c.phone }}" data-company="{{ c.company_name }}" data-tin="{{ c.tin_number }}" data-vat="{{ c.vat_number }}" data-address="{{ c.address }}">
+                            {{ c.name }}{% if c.company_name %} ({{ c.company_name }}){% endif %}{% if c.tin_number %} - TIN: {{ c.tin_number }}{% endif %}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; margin-bottom: 0.75rem;">
+                <div>
+                    <label style="font-size: 0.82rem; font-weight: 600; display: block; margin-bottom: 0.25rem;">Buyer Company Name:</label>
+                    <input type="text" id="buyer_company" name="buyer_company" class="form-input" placeholder="e.g. Ethio Fleet PLC" style="width: 100%;">
+                </div>
+                <div>
+                    <label style="font-size: 0.82rem; font-weight: 600; display: block; margin-bottom: 0.25rem;">Contact Person Name *:</label>
+                    <input type="text" id="buyer_name" name="buyer_name" class="form-input" placeholder="e.g. Ato Abebe Kebede" required style="width: 100%;">
+                </div>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; margin-bottom: 0.75rem;">
+                <div>
+                    <label style="font-size: 0.82rem; font-weight: 600; display: block; margin-bottom: 0.25rem;">Buyer TIN Number:</label>
+                    <input type="text" id="buyer_tin" name="buyer_tin" class="form-input" placeholder="e.g. 0012345678" style="width: 100%; font-family: monospace;">
+                </div>
+                <div>
+                    <label style="font-size: 0.82rem; font-weight: 600; display: block; margin-bottom: 0.25rem;">Phone Number:</label>
+                    <input type="text" id="buyer_phone" name="buyer_phone" class="form-input" placeholder="e.g. 0911223344" style="width: 100%;">
+                </div>
+            </div>
+
+            <div>
+                <label style="font-size: 0.82rem; font-weight: 600; display: block; margin-bottom: 0.25rem;">Buyer Address / City:</label>
+                <input type="text" id="buyer_address" name="buyer_address" class="form-input" placeholder="e.g. Bole Sub-city, Addis Ababa" style="width: 100%;">
+            </div>
+        </div>
+
+        <!-- Quotation Meta & Terms Card -->
+        <div class="card">
+            <h3 style="font-size: 1.05rem; margin-top: 0; margin-bottom: 1rem; color: #0f766e; display: flex; align-items: center; gap: 0.5rem;">
+                <span>📋</span> Quotation Validity & Commercial Terms (የውል ሁኔታዎች)
+            </h3>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; margin-bottom: 0.75rem;">
+                <div>
+                    <label style="font-size: 0.82rem; font-weight: 600; display: block; margin-bottom: 0.25rem;">Issuing Store / Shop Branch:</label>
+                    <select name="warehouse_id" class="form-select" style="width: 100%;">
+                        {% for w in warehouses %}
+                            <option value="{{ w.id }}">{{ w.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div>
+                    <label style="font-size: 0.82rem; font-weight: 600; display: block; margin-bottom: 0.25rem;">Quotation Validity Period:</label>
+                    <select name="valid_days" class="form-select" style="width: 100%;">
+                        <option value="7">7 Days (1 ሳምንት)</option>
+                        <option value="15" selected>15 Days (2 ሳምንት)</option>
+                        <option value="30">30 Days (1 ወር)</option>
+                        <option value="60">60 Days (2 ወር)</option>
+                    </select>
+                </div>
+            </div>
+
+            <div style="margin-bottom: 0.75rem;">
+                <label style="font-size: 0.82rem; font-weight: 600; display: block; margin-bottom: 0.25rem;">Payment Terms:</label>
+                <input type="text" name="payment_terms" value="100% Cash / Bank Transfer upon delivery" class="form-input" style="width: 100%;">
+            </div>
+
+            <div style="margin-bottom: 0.75rem;">
+                <label style="font-size: 0.82rem; font-weight: 600; display: block; margin-bottom: 0.25rem;">Delivery Location / Terms:</label>
+                <input type="text" name="delivery_terms" value="Ex-store Teklehaymanot, Addis Ababa" class="form-input" style="width: 100%;">
+            </div>
+
+            <div>
+                <label style="font-size: 0.82rem; font-weight: 600; display: block; margin-bottom: 0.25rem;">Notes / Warranty Remarks:</label>
+                <input type="text" name="notes" value="All spare parts are genuine quality. Prices include 15% VAT." class="form-input" style="width: 100%;">
+            </div>
+        </div>
+    </div>
+
+    <!-- Line Items Table -->
+    <div class="card" style="margin-bottom: 1.5rem;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+            <h3 style="font-size: 1.05rem; margin: 0; color: #0f766e; display: flex; align-items: center; gap: 0.5rem;">
+                <span>⚙️</span> Spare Parts & Materials Line Items (የዕቃዎች ዝርዝር)
+            </h3>
+            <button type="button" class="btn btn-secondary btn-sm" onclick="addNewRow()" style="font-weight: 700;">
+                ➕ Add Another Part Row
+            </button>
+        </div>
+
+        <div class="table-container">
+            <table class="sortable-table" id="items-table" style="width: 100%;">
+                <thead>
+                    <tr>
+                        <th style="width: 25%;">Select Catalog Part (optional)</th>
+                        <th style="width: 18%;">Part # / OEM</th>
+                        <th style="width: 25%;">Description & Application *</th>
+                        <th style="width: 10%;">Unit</th>
+                        <th style="width: 8%; text-align: center;">Qty</th>
+                        <th style="width: 12%; text-align: right;">Unit Price (ETB)</th>
+                        <th style="width: 12%; text-align: right;">Total (ETB)</th>
+                        <th style="width: 5%; text-align: center;">✕</th>
+                    </tr>
+                </thead>
+                <tbody id="items-tbody">
+                    <!-- Default initial rows -->
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Totals Live Summary -->
+        <div style="display: flex; justify-content: flex-end; margin-top: 1.5rem; border-top: 2px solid hsl(var(--border)); padding-top: 1.25rem;">
+            <div style="width: 320px; background: hsla(var(--bg-hover) / 0.5); padding: 1.25rem; border-radius: 8px; border: 1px solid hsl(var(--border));">
+                <div style="display: flex; justify-content: space-between; font-size: 0.88rem; color: hsl(var(--text-muted)); margin-bottom: 0.35rem;">
+                    <span>Subtotal (Excl. VAT):</span>
+                    <span id="subtotal-display" style="font-weight: 600; font-family: monospace;">0.00 ETB</span>
+                </div>
+                <div style="display: flex; justify-content: space-between; font-size: 0.88rem; color: hsl(var(--text-muted)); margin-bottom: 0.5rem;">
+                    <span>15% VAT (Ethiopian Tax):</span>
+                    <span id="vat-display" style="font-weight: 600; font-family: monospace;">0.00 ETB</span>
+                </div>
+                <div style="display: flex; justify-content: space-between; font-size: 1.2rem; font-weight: 800; border-top: 1.5px dashed hsl(var(--border)); padding-top: 0.5rem; color: #0f766e;">
+                    <span>Grand Total:</span>
+                    <span id="total-display" style="font-family: monospace;">0.00 ETB</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Actions Footer -->
+    <div style="display: flex; justify-content: flex-end; gap: 1rem;">
+        <a href="{% url 'proforma_list' %}" class="btn btn-secondary">Cancel</a>
+        <button type="submit" class="btn" style="background: #0f766e; color: #ffffff; font-weight: 700; font-size: 1.05rem; padding: 0.75rem 2rem;">
+            ✓ Generate Official Proforma Invoice →
+        </button>
+    </div>
+</form>
+
+<!-- Catalog Products Data for Fast Auto-complete -->
+<script>
+const CATALOG_PRODUCTS = [
+    {% for p in products %}
+    {
+        id: {{ p.id }},
+        part_number: "{{ p.part_number|escapejs }}",
+        name: "{{ p.name|escapejs }}",
+        brand: "{{ p.brand|escapejs }}",
+        unit: "{{ p.uom_short|escapejs }}",
+        selling_price: {{ p.selling_price }},
+        vehicle: "{{ p.vehicle_application|truncatechars:40|escapejs }}"
+    },
+    {% endfor %}
+];
+
+function createRowHtml(rowIndex) {
+    let optionsHtml = '<option value="">-- Choose From Catalog (or enter manually) --</option>';
+    CATALOG_PRODUCTS.forEach(p => {
+        optionsHtml += `<option value="${p.id}" data-part="${p.part_number}" data-name="${p.name}" data-price="${p.selling_price}" data-unit="${p.unit}" data-vehicle="${p.vehicle}">[${p.part_number || 'No Part#'}] ${p.name} - ${p.selling_price} ETB</option>`;
+    });
+
+    return `
+    <tr class="item-row">
+        <td>
+            <select class="form-select product-picker" style="width: 100%; font-size: 0.85rem;" onchange="onProductPicked(this)">
+                ${optionsHtml}
+            </select>
+            <input type="hidden" name="item_product_id[]" value="">
+        </td>
+        <td>
+            <input type="text" name="item_part_number[]" class="form-input part-input" placeholder="e.g. 04465-02220" style="width: 100%; font-family: monospace; font-size: 0.85rem;">
+        </td>
+        <td>
+            <input type="text" name="item_description[]" class="form-input desc-input" placeholder="Part name & description" required style="width: 100%; font-size: 0.85rem;">
+        </td>
+        <td>
+            <select name="item_unit[]" class="form-select unit-input" style="width: 100%; font-size: 0.85rem;">
+                <option value="Pcs" selected>Pcs (ቁራጭ)</option>
+                <option value="Ltr">Litre (ሊትር)</option>
+                <option value="Kg">Kg (ኪ.ግ)</option>
+                <option value="Set">Set (ስብስብ)</option>
+                <option value="Mtr">Metre (ሜትር)</option>
+                <option value="Can">Can (ቆርቆሮ)</option>
+                <option value="Btl">Bottle (ጠርሙስ)</option>
+                <option value="Rol">Roll (ጥቅል)</option>
+                <option value="Box">Box (ካርቶን)</option>
+            </select>
+        </td>
+        <td>
+            <input type="number" step="any" name="item_qty[]" class="form-input qty-input" value="1" min="0.1" required style="width: 100%; text-align: center; font-size: 0.85rem;" oninput="calculateTotals()">
+        </td>
+        <td>
+            <input type="number" step="0.01" name="item_price[]" class="form-input price-input" value="0.00" min="0" required style="width: 100%; text-align: right; font-family: monospace; font-size: 0.85rem;" oninput="calculateTotals()">
+        </td>
+        <td style="text-align: right; font-weight: 700; font-family: monospace;" class="line-total-cell">
+            0.00 ETB
+        </td>
+        <td style="text-align: center;">
+            <button type="button" class="btn btn-danger btn-sm" onclick="removeRow(this)" style="padding: 0.2rem 0.5rem; font-size: 0.8rem;">✕</button>
+        </td>
+    </tr>
+    `;
+}
+
+function addNewRow() {
+    const tbody = document.getElementById('items-tbody');
+    tbody.insertAdjacentHTML('beforeend', createRowHtml());
+    calculateTotals();
+}
+
+function removeRow(btn) {
+    const row = btn.closest('tr');
+    const tbody = document.getElementById('items-tbody');
+    if (tbody.querySelectorAll('.item-row').length > 1) {
+        row.remove();
+        calculateTotals();
+    } else {
+        alert('Proforma must have at least one line item.');
+    }
+}
+
+function onProductPicked(selectElem) {
+    const opt = selectElem.options[selectElem.selectedIndex];
+    const row = selectElem.closest('tr');
+    const hiddenId = row.querySelector('input[name="item_product_id[]"]');
+    const partInp = row.querySelector('.part-input');
+    const descInp = row.querySelector('.desc-input');
+    const priceInp = row.querySelector('.price-input');
+    const unitInp = row.querySelector('.unit-input');
+
+    if (opt && opt.value) {
+        hiddenId.value = opt.value;
+        partInp.value = opt.getAttribute('data-part') || '';
+        let fullDesc = opt.getAttribute('data-name') || '';
+        let vehicle = opt.getAttribute('data-vehicle');
+        if (vehicle) fullDesc += ` (${vehicle})`;
+        descInp.value = fullDesc;
+        priceInp.value = parseFloat(opt.getAttribute('data-price') || 0).toFixed(2);
+        
+        let unitVal = opt.getAttribute('data-unit') || 'Pcs';
+        for (let i = 0; i < unitInp.options.length; i++) {
+            if (unitInp.options[i].value.toLowerCase() === unitVal.toLowerCase()) {
+                unitInp.selectedIndex = i;
+                break;
+            }
+        }
+    } else {
+        hiddenId.value = '';
+    }
+    calculateTotals();
+}
+
+function calculateTotals() {
+    let grandTotal = 0;
+    const rows = document.querySelectorAll('.item-row');
+    rows.forEach(row => {
+        const qtyInp = row.querySelector('.qty-input');
+        const priceInp = row.querySelector('.price-input');
+        const totalCell = row.querySelector('.line-total-cell');
+
+        const q = parseFloat(qtyInp ? qtyInp.value : 0) || 0;
+        const p = parseFloat(priceInp ? priceInp.value : 0) || 0;
+        const lineTot = q * p;
+        grandTotal += lineTot;
+
+        if (totalCell) {
+            totalCell.textContent = lineTot.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + ' ETB';
+        }
+    });
+
+    const subtotal = grandTotal > 0 ? (grandTotal / 1.15) : 0;
+    const vat = grandTotal > 0 ? (grandTotal - subtotal) : 0;
+
+    document.getElementById('subtotal-display').textContent = subtotal.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + ' ETB';
+    document.getElementById('vat-display').textContent = vat.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + ' ETB';
+    document.getElementById('total-display').textContent = grandTotal.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + ' ETB';
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    // Customer picker auto-fill
+    const custSelect = document.getElementById('cust-select');
+    if (custSelect) {
+        custSelect.addEventListener('change', function() {
+            const opt = custSelect.options[custSelect.selectedIndex];
+            if (opt && opt.value) {
+                document.getElementById('buyer_company').value = opt.getAttribute('data-company') || '';
+                document.getElementById('buyer_name').value = opt.text.split('(')[0].split('-')[0].trim();
+                document.getElementById('buyer_tin').value = opt.getAttribute('data-tin') || '';
+                document.getElementById('buyer_phone').value = opt.getAttribute('data-phone') || '';
+                document.getElementById('buyer_address').value = opt.getAttribute('data-address') || '';
+            }
+        });
+    }
+
+    // Add 3 default initial rows
+    addNewRow();
+    addNewRow();
+    addNewRow();
+});
+</script>
+{% endblock %}

@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 
 {% block title %}
-{% if object %}Edit {{ object|truncatechars:30 }}{% else %}Add New{% endif %} - Spare ERP
+{% if object %}Edit {{ object|truncatechars:30 }}{% else %}Add New{% endif %} - {{ app_name }}
 {% endblock %}
 
 {% block page_title %}{% if object %}Edit {{ object|truncatechars:30 }}{% else %}Add New{% endif %}{% endblock %}

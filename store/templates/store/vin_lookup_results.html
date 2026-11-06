@@ -1,0 +1,52 @@
+{% extends 'store/base.html' %}
+
+{% block title %}VIN Lookup Results for '{{ query }}' | PARTSOUQ{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="section-header">
+        <h1 class="section-title"><i class="fa-solid fa-barcode text-accent me-2"></i> VIN / Chassis Frame Decoder Results</h1>
+        <span class="badge badge-aftermarket">Decoded: {{ query }}</span>
+    </div>
+
+    {% if matched_models %}
+        <p style="color: var(--text-muted); margin-bottom: 20px;">
+            We decoded chassis / frame code <strong style="color: var(--accent-blue);">"{{ query }}"</strong>. Select your exact vehicle model below to browse exploded schematics and OEM parts:
+        </p>
+
+        <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 20px;">
+            {% for model in matched_models %}
+            <div style="background: white; border: 1px solid var(--border-color); border-radius: 10px; padding: 20px; transition: all 0.2s;" onmouseenter="this.style.borderColor='#0284c7'" onmouseleave="this.style.borderColor='#e2e8f0'">
+                <div style="font-size: 0.8rem; font-weight: 800; color: var(--accent-blue); text-transform: uppercase; margin-bottom: 4px;">
+                    {{ model.make.name }}
+                </div>
+                <h3 style="font-family: 'Outfit', sans-serif; font-size: 1.25rem; font-weight: 800; color: var(--header-navy); margin-bottom: 8px;">
+                    {{ model.name }}
+                </h3>
+                <div style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 15px;">
+                    <div><strong>Production Years:</strong> {{ model.year_from }} - {{ model.year_to }}</div>
+                    <div><strong>Engine Specs:</strong> {{ model.engine_type|default:"Factory Specs" }}</div>
+                    <div><strong>Chassis Prefixes:</strong> <span style="font-family: monospace; color: var(--header-navy);">{{ model.chassis_prefixes }}</span></div>
+                </div>
+
+                <a href="{% url 'store:vehicle_categories' model.id %}" class="btn btn-primary" style="width: 100%;">
+                    <i class="fa-solid fa-diagram-project me-1"></i> Browse Schematics & Parts
+                </a>
+            </div>
+            {% endfor %}
+        </div>
+    {% else %}
+        <div style="text-align: center; padding: 40px 20px;">
+            <i class="fa-solid fa-triangle-exclamation" style="font-size: 3rem; color: var(--accent-amber); margin-bottom: 15px;"></i>
+            <h2>No Exact Vehicle Match Found for "{{ query }}"</h2>
+            <p class="text-muted" style="max-width: 500px; margin: 10px auto 20px;">
+                Please try searching by car make/model name (e.g. Prado, Hilux, Patrol, Camry) or search by OEM Part Number directly.
+            </p>
+
+            <a href="{% url 'store:partsouq_catalog' %}" class="btn btn-primary">
+                <i class="fa-solid fa-house me-1"></i> Return to Catalog Home
+            </a>
+        </div>
+    {% endif %}
+</div>
+{% endblock %}

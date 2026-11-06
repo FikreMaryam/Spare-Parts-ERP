@@ -9,8 +9,13 @@ from .models import (
     CarModel,
     Warehouse,
     StockMovement,
+    AssemblyCategory,
+    AssemblyDiagram,
+    DiagramCallout,
+    PartSubstitute,
 )
 from django.utils.safestring import mark_safe
+
 
 
 @admin.register(Category)
@@ -95,5 +100,37 @@ class ProductAdmin(admin.ModelAdmin):
         return "-"
 
     low_stock_alert.short_description = "Stock Alert"
+
+
+@admin.register(AssemblyCategory)
+class AssemblyCategoryAdmin(admin.ModelAdmin):
+    list_display = ("name", "slug", "icon")
+    search_fields = ("name",)
+
+
+class DiagramCalloutInline(admin.TabularInline):
+    model = DiagramCallout
+    extra = 2
+
+
+@admin.register(AssemblyDiagram)
+class AssemblyDiagramAdmin(admin.ModelAdmin):
+    list_display = ("title", "diagram_code", "car_model", "category")
+    list_filter = ("category", "car_model__make")
+    search_fields = ("title", "diagram_code", "car_model__name")
+    inlines = [DiagramCalloutInline]
+
+
+@admin.register(DiagramCallout)
+class DiagramCalloutAdmin(admin.ModelAdmin):
+    list_display = ("callout_number", "diagram", "product", "part_number", "x_percent", "y_percent")
+    search_fields = ("callout_number", "part_number", "part_name", "product__name", "product__part_number")
+
+
+@admin.register(PartSubstitute)
+class PartSubstituteAdmin(admin.ModelAdmin):
+    list_display = ("original_product", "substitute_product", "substitute_type")
+    list_filter = ("substitute_type",)
+
 
 

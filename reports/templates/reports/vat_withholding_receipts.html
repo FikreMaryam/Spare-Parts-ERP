@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+
+{% block title %}VAT Withholding Receipts - {{ app_name }}{% endblock %}
+
+{% block page_title %}VAT Withholding Receipts{% endblock %}
+
+{% block content %}
+<div style="max-width: 1200px; margin: 0 auto; display: grid; gap: 2rem;">
+    <div class="card" style="padding: 2rem;">
+        <h2 style="margin: 0 0 1rem 0; font-size: 1.2rem;">Add a company withholding receipt</h2>
+        <form method="post" enctype="multipart/form-data">
+            {% csrf_token %}
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem;">
+                <div>
+                    <label for="company_name" style="display: block; margin-bottom: 0.4rem; font-weight: 600;">Company / payer name</label>
+                    <input id="company_name" type="text" name="company_name" class="form-input" required style="width: 100%;">
+                </div>
+                <div>
+                    <label for="tin_number" style="display: block; margin-bottom: 0.4rem; font-weight: 600;">TIN</label>
+                    <input id="tin_number" type="text" name="tin_number" class="form-input" style="width: 100%;">
+                </div>
+                <div>
+                    <label for="withholding_period" style="display: block; margin-bottom: 0.4rem; font-weight: 600;">Period / month</label>
+                    <input id="withholding_period" type="text" name="withholding_period" class="form-input" placeholder="e.g. July 2026" style="width: 100%;">
+                </div>
+                <div>
+                    <label for="amount" style="display: block; margin-bottom: 0.4rem; font-weight: 600;">Withheld VAT amount (ETB)</label>
+                    <input id="amount" type="number" step="0.01" name="amount" class="form-input" value="0.00" style="width: 100%;">
+                </div>
+            </div>
+
+            <div style="margin-top: 1rem;">
+                <label for="receipt_file" style="display: block; margin-bottom: 0.4rem; font-weight: 600;">Upload receipt file</label>
+                <input id="receipt_file" type="file" name="receipt_file" accept=".pdf,.png,.jpg,.jpeg,.webp,.gif" class="form-input" style="width: 100%;">
+            </div>
+
+            <div style="margin-top: 1rem;">
+                <label for="notes" style="display: block; margin-bottom: 0.4rem; font-weight: 600;">Notes</label>
+                <textarea id="notes" name="notes" rows="3" class="form-textarea" style="width: 100%;"></textarea>
+            </div>
+
+            <div style="margin-top: 1.5rem; display: flex; justify-content: flex-end; gap: 0.75rem;">
+                <a href="{% url 'reports_settings' %}" class="btn btn-secondary">Back to Settings</a>
+                <button type="submit" class="btn">Save receipt</button>
+            </div>
+        </form>
+    </div>
+
+    <div class="card" style="padding: 2rem;">
+        <h2 style="margin: 0 0 1rem 0; font-size: 1.2rem;">Saved receipts</h2>
+        {% if receipts %}
+            <div style="display: grid; gap: 1rem;">
+                {% for receipt in receipts %}
+                    <div style="padding: 1rem 1.1rem; border: 1px solid hsl(var(--border)); border-radius: 12px; background: hsla(var(--bg-hover) / 0.4);">
+                        <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem; flex-wrap: wrap;">
+                            <div>
+                                <div style="font-size: 0.8rem; color: hsl(var(--text-muted)); text-transform: uppercase; letter-spacing: 0.08em;">{{ receipt.company_name }}</div>
+                                <div style="font-weight: 700; margin-top: 0.25rem;">{{ receipt.withholding_period|default:'No period stated' }}</div>
+                            </div>
+                            <div style="font-weight: 700; color: hsl(var(--accent));">{{ receipt.amount|floatformat:2 }} ETB</div>
+                        </div>
+                        <div style="margin-top: 0.75rem; color: hsl(var(--text-muted));">
+                            {% if receipt.tin_number %}TIN: {{ receipt.tin_number }}{% endif %}
+                            {% if receipt.notes %}· {{ receipt.notes }}{% endif %}
+                        </div>
+                        {% if receipt.receipt_file %}
+                            <div style="margin-top: 0.8rem;">
+                                <a href="{{ receipt.receipt_file.url }}" target="_blank" rel="noopener" class="btn btn-secondary btn-sm">Open attached file</a>
+                            </div>
+                        {% endif %}
+                    </div>
+                {% endfor %}
+            </div>
+        {% else %}
+            <p style="margin: 0; color: hsl(var(--text-muted));">No withholding receipts have been uploaded yet.</p>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

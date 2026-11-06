@@ -7,12 +7,15 @@ from django.db import connection
 from customers.models import Client
 from .models import B2BConnection, B2BMessage
 
+def _get_current_tenant():
+    schema = getattr(connection, 'schema_name', 'public')
+    tenant, _ = Client.objects.get_or_create(schema_name=schema, defaults={'name': 'Main Shop'})
+    return schema, tenant
+
 @login_required
 def network_home(request):
     """Shows active and pending connections"""
-    # Current tenant is deduced from the current schema
-    current_schema = connection.schema_name
-    current_tenant = Client.objects.get(schema_name=current_schema)
+    current_schema, current_tenant = _get_current_tenant()
 
     # Connections where we requested
     outgoing_pending = B2BConnection.objects.filter(requester=current_tenant, status='pending')
@@ -36,14 +39,13 @@ def network_home(request):
 def request_connection(request):
     if request.method == 'POST':
         target_username = request.POST.get('shop_name', '').strip().lower()
-        current_schema = connection.schema_name
+        current_schema, current_tenant = _get_current_tenant()
         
         if target_username == current_schema:
             messages.error(request, "You cannot connect to yourself.")
             return redirect('b2b:network_home')
             
         try:
-            current_tenant = Client.objects.get(schema_name=current_schema)
             target_tenant = Client.objects.exclude(schema_name='public').get(schema_name=target_username)
             
             # Check if connection already exists in either direction
@@ -69,8 +71,7 @@ def request_connection(request):
 
 @login_required
 def accept_connection(request, connection_id):
-    current_schema = connection.schema_name
-    current_tenant = Client.objects.get(schema_name=current_schema)
+    current_schema, current_tenant = _get_current_tenant()
     
     conn = get_object_or_404(B2BConnection, id=connection_id, receiver=current_tenant, status='pending')
     conn.status = 'accepted'
@@ -81,8 +82,7 @@ def accept_connection(request, connection_id):
 
 @login_required
 def b2b_chat(request, connection_id):
-    current_schema = connection.schema_name
-    current_tenant = Client.objects.get(schema_name=current_schema)
+    current_schema, current_tenant = _get_current_tenant()
     
     conn = get_object_or_404(B2BConnection, id=connection_id, status='accepted')
     
@@ -111,3 +111,4 @@ def b2b_chat(request, connection_id):
         'current_tenant': current_tenant,
         'chat_messages': messages_list
     })
+

@@ -1,0 +1,91 @@
+{% extends "store/base.html" %}
+
+{% block title %}About Us | FETAN SPARE PARTS{% endblock %}
+
+{% block content %}
+<div class="card" style="max-width: 1000px; margin: 0 auto; padding: 30px;">
+    <div class="section-header" style="margin-bottom: 24px;">
+        <h1 class="section-title" style="font-size: 1.8rem;">
+            <i class="fa-solid fa-store text-accent me-2"></i> About FETAN SPARE PARTS
+        </h1>
+        <span class="badge badge-genuine"><i class="fa-solid fa-shield-halved me-1"></i> Genuine OEM Parts Specialist</span>
+    </div>
+
+    <!-- Banner Info -->
+    <div style="background: linear-gradient(135deg, #0f172a 0%, #1c2541 100%); color: white; border-radius: 12px; padding: 30px; margin-bottom: 30px; box-shadow: 0 4px 15px rgba(0,0,0,0.15);">
+        <h2 style="font-family: 'Outfit', sans-serif; font-size: 1.6rem; color: #38bdf8; margin-bottom: 12px;">
+            Welcome to FETAN SPARE PARTS
+        </h2>
+        <p style="font-size: 1.05rem; line-height: 1.7; color: #cbd5e1; margin-bottom: 15px;">
+            FETAN SPARE PARTS is your premier destination for genuine OEM and high-grade automotive spare parts in Addis Ababa. We specialize in fast VIN decoding, original part cross-referencing, and direct supply of mechanical, electrical, and body components for all major vehicle makes.
+        </p>
+        <div style="display: flex; gap: 20px; flex-wrap: wrap; margin-top: 20px; font-size: 0.95rem;">
+            <div><i class="fa-solid fa-location-dot text-accent me-1"></i> <strong>Location:</strong> Teklehaymanot Addis Hope Building House number G22</div>
+            <div><i class="fa-solid fa-city text-accent me-1"></i> <strong>City:</strong> Addis Ababa, Ethiopia</div>
+        </div>
+    </div>
+
+    <!-- Company Highlights & Features -->
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px; margin-bottom: 30px;">
+        <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 20px;">
+            <div style="width: 48px; height: 48px; background: #e0f2fe; color: #0284c7; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 1.4rem; margin-bottom: 12px;">
+                <i class="fa-solid fa-shield-check"></i>
+            </div>
+            <h3 style="font-family: 'Outfit', sans-serif; font-size: 1.15rem; color: #0f172a; margin-bottom: 8px;">100% Genuine OEM Parts</h3>
+            <p style="font-size: 0.9rem; color: #64748b; line-height: 1.5;">
+                We source directly from official manufacturers to ensure maximum durability, exact fitment, and peak vehicle performance.
+            </p>
+        </div>
+
+        <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 20px;">
+            <div style="width: 48px; height: 48px; background: #dcfce7; color: #16a34a; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 1.4rem; margin-bottom: 12px;">
+                <i class="fa-solid fa-barcode"></i>
+            </div>
+            <h3 style="font-family: 'Outfit', sans-serif; font-size: 1.15rem; color: #0f172a; margin-bottom: 8px;">Fast VIN & Frame Search</h3>
+            <p style="font-size: 0.9rem; color: #64748b; line-height: 1.5;">
+                Decode your vehicle's VIN or Chassis code instantly to access exact exploded assembly schematics and part callouts.
+            </p>
+        </div>
+
+        <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 20px;">
+            <div style="width: 48px; height: 48px; background: #fef3c7; color: #d97706; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 1.4rem; margin-bottom: 12px;">
+                <i class="fa-solid fa-truck-fast"></i>
+            </div>
+            <h3 style="font-family: 'Outfit', sans-serif; font-size: 1.15rem; color: #0f172a; margin-bottom: 8px;">Fast Pickup & Delivery</h3>
+            <p style="font-size: 0.9rem; color: #64748b; line-height: 1.5;">
+                Order online and pick up directly at our Teklehaymanot counter or arrange fast courier delivery across the region.
+            </p>
+        </div>
+    </div>
+
+    <!-- Store Contact & Location Details -->
+    <div style="background: white; border: 1px solid #e2e8f0; border-radius: 10px; padding: 25px;">
+        <h2 style="font-family: 'Outfit', sans-serif; font-size: 1.3rem; color: #0f172a; margin-bottom: 16px; border-bottom: 2px solid #f1f5f9; padding-bottom: 10px;">
+            <i class="fa-solid fa-address-card text-accent me-2"></i> Visit Our Shop & Contact Us
+        </h2>
+
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; font-size: 0.95rem;">
+            <div>
+                <p style="margin-bottom: 8px;"><strong>Store Name:</strong> FETAN SPARE PARTS</p>
+                <p style="margin-bottom: 8px;"><strong>Building:</strong> Teklehaymanot Addis Hope Building</p>
+                <p style="margin-bottom: 8px;"><strong>House Number:</strong> G22</p>
+                <p style="margin-bottom: 8px;"><strong>City:</strong> Addis Ababa, Ethiopia</p>
+            </div>
+            <div>
+                <p style="margin-bottom: 8px;"><strong>Working Hours:</strong> Monday – Saturday: 8:00 AM – 6:30 PM</p>
+                <p style="margin-bottom: 8px;"><strong>Online Store:</strong> Open 24/7 for browsing & VIN decoding</p>
+                <p style="margin-bottom: 8px;"><strong>Support:</strong> Staff verification call upon order placement</p>
+            </div>
+        </div>
+
+        <div style="margin-top: 25px; text-align: center;">
+            <a href="{% url 'store:partsouq_catalog' %}" class="btn btn-primary" style="padding: 10px 24px;">
+                <i class="fa-solid fa-magnifying-glass me-1"></i> Browse Parts Catalog
+            </a>
+            <a href="{% url 'store:vin_lookup' %}" class="btn btn-outline" style="margin-left: 10px; padding: 10px 20px;">
+                <i class="fa-solid fa-id-card me-1"></i> Decode VIN
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %}

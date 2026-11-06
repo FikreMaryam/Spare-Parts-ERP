@@ -1,0 +1,157 @@
+{% extends "base.html" %}
+
+{% block title %}Landed Cost Sheet - {{ shipment.shipment_number }} - {{ app_name }}{% endblock %}
+
+{% block page_title %}Import Landed Cost Worksheet (የውጭ ዕቃዎች ዋጋ ስሌት){% endblock %}
+
+{% block content %}
+<div class="header-actions" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 1rem;">
+    <div>
+        <a href="{% url 'import_shipments_list' %}" class="btn btn-secondary btn-sm">← Back to Import Shipments</a>
+    </div>
+    <div style="display: flex; gap: 0.6rem; align-items: center;">
+        <button onclick="window.print()" class="btn btn-secondary btn-sm" style="font-weight: 700;">
+            🖨️ Print Landed Cost Sheet
+        </button>
+        {% if shipment.status != 'ARRIVED' %}
+        <a href="{% url 'import_shipment_receive' shipment.id %}" class="btn" style="background: #16a34a; color: #ffffff; font-weight: 700;" onclick="return confirm('Receive this shipment into warehouse? This will update each part\'s cost price to the calculated landed cost and increment stock quantities.')">
+            ✓ Receive into Warehouse Inventory (ዕቃውን አስገባ)
+        </a>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Shipment Overview Card -->
+<div class="card" style="margin-bottom: 1.5rem;">
+    <div style="display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #0f766e; padding-bottom: 1rem; margin-bottom: 1.25rem; flex-wrap: wrap; gap: 1rem;">
+        <div>
+            <div style="display: inline-block; background: #0f766e; color: #ffffff; font-size: 0.72rem; font-weight: 800; padding: 0.15rem 0.5rem; border-radius: 4px; text-transform: uppercase;">
+                International Import Logistics
+            </div>
+            <h1 style="font-size: 1.45rem; font-weight: 800; margin: 0.35rem 0 0.15rem 0; color: hsl(var(--text));">
+                {{ shipment.title }}
+            </h1>
+            <div style="font-size: 0.85rem; color: hsl(var(--text-muted));">
+                Shipment Ref: <strong style="font-family: monospace;">{{ shipment.shipment_number }}</strong>
+                {% if shipment.bill_of_lading %} &nbsp;|&nbsp; B/L: <strong style="font-family: monospace;">{{ shipment.bill_of_lading }}</strong>{% endif %}
+            </div>
+        </div>
+
+        <div style="text-align: right;">
+            {% if shipment.status == 'ARRIVED' %}
+            <span class="badge badge-ok" style="font-size: 0.85rem; padding: 0.35rem 0.85rem;">✓ RECEIVED IN WAREHOUSE</span>
+            {% else %}
+            <span class="badge badge-secondary" style="font-size: 0.85rem; padding: 0.35rem 0.85rem;">Status: {{ shipment.get_status_display }}</span>
+            {% endif %}
+            <div style="margin-top: 0.4rem; font-size: 0.82rem; color: hsl(var(--text-muted));">
+                Order Date: {{ shipment.order_date|date:"d/m/Y" }}
+            </div>
+        </div>
+    </div>
+
+    <!-- Logistics & Financial Breakdown Grid -->
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1.25rem;">
+        <div style="background: hsla(var(--bg-hover) / 0.5); padding: 1rem; border-radius: 8px; border: 1px solid hsl(var(--border));">
+            <span style="font-size: 0.75rem; font-weight: 800; text-transform: uppercase; color: hsl(var(--text-muted)); display: block; margin-bottom: 0.4rem;">Origin & Destination</span>
+            <div style="font-size: 0.95rem; font-weight: 700; color: hsl(var(--text));">🌍 {{ shipment.origin_country }}</div>
+            <div style="font-size: 0.82rem; color: hsl(var(--text-muted)); margin-top: 0.2rem;">From: {{ shipment.departure_port|default:"Origin Port" }}</div>
+            <div style="font-size: 0.82rem; color: hsl(var(--text-muted));">To: <strong>{{ shipment.arrival_port }}</strong></div>
+            <div style="font-size: 0.82rem; color: #0f766e; margin-top: 0.3rem;">Store: <strong>{{ shipment.destination_warehouse.name|default:"Main Store" }}</strong></div>
+        </div>
+
+        <div style="background: hsla(var(--bg-hover) / 0.5); padding: 1rem; border-radius: 8px; border: 1px solid hsl(var(--border));">
+            <span style="font-size: 0.75rem; font-weight: 800; text-transform: uppercase; color: hsl(var(--text-muted)); display: block; margin-bottom: 0.4rem;">Currency & Customs Exchange</span>
+            <div style="font-size: 1.1rem; font-weight: 800; font-family: monospace; color: hsl(var(--text));">
+                1 {{ shipment.currency }} = {{ shipment.exchange_rate }} ETB
+            </div>
+            <div style="font-size: 0.85rem; color: hsl(var(--text-muted)); margin-top: 0.35rem;">
+                Total FOB (Foreign): <strong class="mono">{{ shipment.total_fob_foreign_currency|floatformat:2 }} {{ shipment.currency }}</strong>
+            </div>
+            <div style="font-size: 0.85rem; color: hsl(var(--text-muted));">
+                Total FOB in ETB: <strong class="mono">{{ shipment.total_fob_etb|floatformat:2 }} ETB</strong>
+            </div>
+        </div>
+
+        <div style="background: hsla(var(--bg-hover) / 0.5); padding: 1rem; border-radius: 8px; border: 1px solid hsl(var(--border));">
+            <span style="font-size: 0.75rem; font-weight: 800; text-transform: uppercase; color: hsl(var(--text-muted)); display: block; margin-bottom: 0.4rem;">Direct Landed Overheads</span>
+            <div style="font-size: 1.15rem; font-weight: 800; font-family: monospace; color: #b45309;">
+                {{ shipment.total_direct_landed_costs_etb|floatformat:2 }} ETB
+            </div>
+            <div style="font-size: 0.78rem; color: hsl(var(--text-muted)); margin-top: 0.35rem;">
+                Freight + Insurance + Customs Tariffs + Port Handling + Trucking
+            </div>
+        </div>
+
+        <div style="background: #f0fdfa; padding: 1rem; border-radius: 8px; border: 1.5px solid #0f766e;">
+            <span style="font-size: 0.75rem; font-weight: 800; text-transform: uppercase; color: #0f766e; display: block; margin-bottom: 0.4rem;">Total Landed Cost in ETB</span>
+            <div style="font-size: 1.45rem; font-weight: 900; font-family: monospace; color: #0f766e;">
+                {{ shipment.total_shipment_landed_cost_etb|floatformat:2 }} ETB
+            </div>
+            <div style="font-size: 0.78rem; color: #0f766e; margin-top: 0.35rem;">
+                True landed valuation for financial reporting & stock costing
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Itemized Landed Cost Allocation Table -->
+<div class="card" style="padding: 0; overflow: hidden; margin-bottom: 2rem;">
+    <div style="padding: 1.25rem 1.5rem; background: hsla(var(--bg-hover) / 0.5); border-bottom: 1px solid hsl(var(--border));">
+        <h3 style="margin: 0; font-size: 1.05rem; font-weight: 800; color: hsl(var(--text));">
+            📊 Landed Cost Allocation per Spare Part (የእያንዳንዱ ዕቃ የወጣበት ዋጋ ስሌት)
+        </h3>
+        <p style="margin: 0.25rem 0 0 0; font-size: 0.8rem; color: hsl(var(--text-muted));">
+            Landed overhead is allocated proportionally to FOB value so each part receives its accurate share of shipping, insurance, customs, and port clearing fees.
+        </p>
+    </div>
+
+    <div class="table-container">
+        <table class="sortable-table">
+            <thead>
+                <tr>
+                    <th style="padding-left: 1.5rem; width: 4%;">#</th>
+                    <th style="width: 18%;">Part # / OEM</th>
+                    <th style="width: 25%;">Part Name & Description</th>
+                    <th style="width: 8%; text-align: center;">Qty</th>
+                    <th style="width: 11%; text-align: right;">FOB Unit ({{ shipment.currency }})</th>
+                    <th style="width: 11%; text-align: right;">FOB Unit (ETB)</th>
+                    <th style="width: 11%; text-align: right;">Allocated Overhead</th>
+                    <th style="width: 12%; text-align: right; background: #f0fdfa;">Landed Cost / Unit (ETB)</th>
+                    <th style="width: 11%; text-align: right; padding-right: 1.5rem;">Target Selling Price</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in shipment.items.all %}
+                <tr>
+                    <td style="padding-left: 1.5rem; color: hsl(var(--text-muted));">{{ forloop.counter }}</td>
+                    <td style="font-family: monospace; font-weight: 700;">
+                        {{ item.product.part_number|default:"—" }}
+                    </td>
+                    <td>
+                        <strong>{{ item.product.name }}</strong>
+                        {% if item.product.brand %}<span style="font-size: 0.8rem; color: hsl(var(--text-muted));">({{ item.product.brand }})</span>{% endif %}
+                    </td>
+                    <td style="text-align: center; font-weight: 800;">
+                        {{ item.quantity|floatformat:0 }} <span style="font-size: 0.75rem; font-weight: normal; color: hsl(var(--text-muted));">{{ item.product.uom_short }}</span>
+                    </td>
+                    <td style="text-align: right; font-family: monospace;">{{ item.foreign_fob_price|floatformat:2 }}</td>
+                    <td style="text-align: right; font-family: monospace;">
+                        {% widthratio item.foreign_fob_price 1 shipment.exchange_rate as fob_etb %}
+                        {{ fob_etb|floatformat:2 }}
+                    </td>
+                    <td style="text-align: right; font-family: monospace; color: #b45309;">
+                        +{{ item.allocated_overhead_per_unit_etb|floatformat:2 }}
+                    </td>
+                    <td style="text-align: right; font-weight: 900; font-family: monospace; color: #0f766e; font-size: 1.05rem; background: #f0fdfa;">
+                        {{ item.calculated_landed_cost_per_unit_etb|floatformat:2 }} ETB
+                    </td>
+                    <td style="text-align: right; padding-right: 1.5rem; font-weight: 800; font-family: monospace; color: hsl(var(--text));">
+                        {{ item.target_selling_price_etb|floatformat:2 }} ETB
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,283 @@
+{% extends "base.html" %}
+
+{% block title %}Parts Analysis - {{ app_name }}{% endblock %}
+{% block page_title %}Parts Analysis{% endblock %}
+
+{% block extra_css %}
+<style>
+    .parts-analysis-page { max-width: 1400px; margin: 0 auto; display: grid; gap: 1.25rem; min-width: 0; }
+    .parts-analysis-page .card { min-width: 0; margin-bottom: 0; }
+    .parts-receipt-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr)); gap: 1rem; }
+    .parts-lines-table { min-width: 680px; }
+    .parts-audit-table { min-width: 760px; }
+    .parts-table-scroll { width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+    .parts-action-row { display: flex; justify-content: flex-end; gap: 0.75rem; flex-wrap: wrap; margin-top: 1.25rem; }
+    .parts-audit-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 420px), 1fr)); gap: 1.25rem; }
+    .parts-analysis-page input, .parts-analysis-page select, .parts-analysis-page textarea { min-width: 0; max-width: 100%; }
+    .parts-line-product { min-width: 260px; }
+    .receipt-detail-list { margin: 0.35rem 0 0; padding-left: 1rem; color: hsl(var(--text-muted)); font-size: 0.83rem; }
+    .receipt-detail-list li + li { margin-top: 0.2rem; }
+    @media (max-width: 640px) {
+        .parts-analysis-page { gap: 0.85rem; }
+        .parts-analysis-page .card { padding: 1rem; }
+        .parts-analysis-page .card-header { align-items: flex-start; flex-direction: column; gap: 0.35rem; padding: 1rem; }
+        .parts-action-row { display: grid; grid-template-columns: 1fr; }
+        .parts-action-row .btn { width: 100%; text-align: center; }
+        .parts-line-product { min-width: 220px; }
+        .parts-audit-grid { grid-template-columns: minmax(0, 1fr); }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="parts-analysis-page">
+    <div class="card" style="padding: 1.5rem 1.75rem;">
+        <h2 style="margin: 0 0 0.4rem; font-size: 1.2rem;">Record parts from a receipt</h2>
+        <p class="text-muted" style="margin: 0;">Attach a receipt photo or PDF and enter its lines below. You confirm each part, quantity, and price before the transaction is recorded and stock changes.</p>
+        <p class="text-muted" style="margin: 0.5rem 0 0;">Receipt photos and PDFs are stored as source documents; text is not automatically read. Type or paste the receipt text for your records.</p>
+    </div>
+
+    {% if errors %}
+    <div class="card" style="padding: 1rem 1.5rem; border-color: hsl(var(--error));">
+        <ul style="margin: 0; padding-left: 1.25rem; color: hsl(var(--error));">
+            {% for error in errors %}<li>{{ error }}</li>{% endfor %}
+        </ul>
+    </div>
+    {% endif %}
+
+    <form method="post" enctype="multipart/form-data" class="card" style="padding: 1.5rem 1.75rem;">
+        {% csrf_token %}
+        <h2 style="margin: 0 0 1.25rem; font-size: 1.1rem;">Receipt details</h2>
+        <div class="parts-receipt-grid">
+            <div>
+                <label for="entry_type" style="display: block; margin-bottom: 0.4rem; font-weight: 600;">Transaction type *</label>
+                <select id="entry_type" name="entry_type" required class="form-input" style="width: 100%;">
+                    <option value="">Choose bought or sold</option>
+                    <option value="purchase" {% if entry_type == "purchase" %}selected{% endif %}>Parts bought</option>
+                    <option value="sale" {% if entry_type == "sale" %}selected{% endif %}>Parts sold</option>
+                </select>
+            </div>
+            <div>
+                <label for="reference" style="display: block; margin-bottom: 0.4rem; font-weight: 600;">Receipt / reference number *</label>
+                <input id="reference" name="reference" value="{{ reference|default:'' }}" maxlength="100" required class="form-input" style="width: 100%;">
+            </div>
+            <div>
+                <label for="document_date" style="display: block; margin-bottom: 0.4rem; font-weight: 600;">Date printed on receipt *</label>
+                <input id="document_date" name="document_date" type="date" value="{{ document_date|default:today }}" required class="form-input" style="width: 100%;">
+            </div>
+            <div>
+                <label for="party_name" style="display: block; margin-bottom: 0.4rem; font-weight: 600;">Supplier or buyer</label>
+                <input id="party_name" name="party_name" value="{{ party_name|default:'' }}" maxlength="150" class="form-input" placeholder="Optional company or person" style="width: 100%;">
+            </div>
+            <div>
+                <label for="warehouse_id" style="display: block; margin-bottom: 0.4rem; font-weight: 600;">Warehouse / branch</label>
+                <select id="warehouse_id" name="warehouse_id" class="form-input" style="width: 100%;">
+                    <option value="">Not specified</option>
+                    {% for warehouse in warehouses %}
+                    <option value="{{ warehouse.id }}" {% if selected_warehouse == warehouse.id|stringformat:"s" %}selected{% endif %}>{{ warehouse.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div id="payment-method-field">
+                <label for="payment_method" style="display: block; margin-bottom: 0.4rem; font-weight: 600;">Sale payment method</label>
+                <select id="payment_method" name="payment_method" class="form-input" style="width: 100%;">
+                    {% for value, label in payment_method_choices %}
+                    <option value="{{ value }}" {% if selected_payment_method == value %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <label for="receipt_file" style="display: block; margin-bottom: 0.4rem; font-weight: 600;">Receipt photo / PDF</label>
+                <input id="receipt_file" type="file" name="receipt_file" accept=".pdf,image/*" class="form-input" style="width: 100%;">
+                <small class="text-muted">PDF or image, up to 10 MB.</small>
+            </div>
+        </div>
+
+        <div style="margin-top: 1rem;">
+            <label for="source_text" style="display: block; margin-bottom: 0.4rem; font-weight: 600;">Receipt text / notes</label>
+            <textarea id="source_text" name="source_text" rows="4" maxlength="20000" class="form-textarea" placeholder="Paste or type the text from the receipt, if available." style="width: 100%;">{{ source_text|default:'' }}</textarea>
+        </div>
+
+        <div style="display: flex; justify-content: space-between; align-items: center; gap: 1rem; flex-wrap: wrap; margin: 1.5rem 0 0.75rem;">
+            <div>
+                <h2 style="margin: 0; font-size: 1.1rem;">Confirm part lines</h2>
+                <small class="text-muted">Choose an existing inventory item for each receipt line. Add new items in Inventory first.</small>
+            </div>
+            <button type="button" class="btn btn-secondary btn-sm" id="add-line">Add part line</button>
+        </div>
+        <div class="parts-table-scroll">
+            <table class="parts-lines-table" style="width: 100%; border-collapse: collapse;">
+                <thead>
+                    <tr style="text-align: left; color: hsl(var(--text-muted));">
+                        <th style="padding: 0.65rem;">Part</th>
+                        <th style="padding: 0.65rem; width: 150px;">Quantity</th>
+                        <th style="padding: 0.65rem; width: 190px;">Unit cost / selling price (ETB)</th>
+                        <th style="padding: 0.65rem; width: 90px;">Remove</th>
+                    </tr>
+                </thead>
+                <tbody id="part-lines">
+                    {% for line in line_rows %}
+                    <tr class="part-line">
+                        <td style="padding: 0.5rem;">
+                            <select name="product_id[]" required class="form-input" style="width: 100%;">
+                                <option value="">Select a part</option>
+                                {% for product in products %}
+                                <option value="{{ product.id }}" {% if line.product_id == product.id|stringformat:"s" %}selected{% endif %}>{{ product.name }}{% if product.part_number %} — {{ product.part_number }}{% elif product.sku %} — {{ product.sku }}{% endif %}</option>
+                                {% endfor %}
+                            </select>
+                        </td>
+                        <td style="padding: 0.5rem;"><input name="quantity[]" type="number" min="1" step="1" value="{{ line.quantity }}" required class="form-input" style="width: 100%;"></td>
+                        <td style="padding: 0.5rem;"><input name="unit_price[]" type="number" min="0.01" step="0.01" value="{{ line.unit_price }}" required class="form-input" style="width: 100%;"></td>
+                        <td style="padding: 0.5rem;"><button type="button" class="btn btn-danger btn-sm remove-line">Remove</button></td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        <div class="parts-action-row">
+            <a href="{% url 'product_list' %}" class="btn btn-secondary">Cancel</a>
+            <button type="submit" class="btn">Confirm and update stock</button>
+        </div>
+    </form>
+
+    <div class="card table-card">
+        <div class="card-header"><strong>Parts bought and sold</strong><span class="text-muted">Filtered by the receipt dates below</span></div>
+        <form method="get" style="padding: 1rem 1.25rem; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), 1fr)); gap: 0.75rem; align-items: end;">
+            <div>
+                <label for="audit-from" style="display: block; margin-bottom: 0.35rem; font-weight: 600;">From receipt date</label>
+                <input id="audit-from" type="date" name="date_from" value="{{ date_from }}" class="form-input" style="width: 100%;">
+            </div>
+            <div>
+                <label for="audit-to" style="display: block; margin-bottom: 0.35rem; font-weight: 600;">To receipt date</label>
+                <input id="audit-to" type="date" name="date_to" value="{{ date_to }}" class="form-input" style="width: 100%;">
+            </div>
+            <div>
+                <label for="audit-search" style="display: block; margin-bottom: 0.35rem; font-weight: 600;">Search receipts / parts</label>
+                <input id="audit-search" type="search" name="q" value="{{ search_text }}" placeholder="Receipt no., party, part..." class="form-input" style="width: 100%;">
+            </div>
+            <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                <button type="submit" class="btn">Filter audit</button>
+                <a href="{% url 'parts_analysis' %}" class="btn btn-secondary">Clear</a>
+            </div>
+        </form>
+        <div class="table-container">
+            <table class="sortable-table parts-audit-table">
+                <thead><tr><th>Part</th><th>Part / SKU</th><th>Bought</th><th>Sold</th><th>Current stock</th></tr></thead>
+                <tbody>
+                    {% for product in products %}
+                    <tr>
+                        <td><a href="{% url 'product_detail' product.id %}" class="fw-600">{{ product.name }}</a></td>
+                        <td>{{ product.part_number|default:product.sku|default:"—" }}</td>
+                        <td>{{ product.total_bought }}</td>
+                        <td>{{ product.total_sold }}</td>
+                        <td>{{ product.quantity }}</td>
+                    </tr>
+                    {% empty %}
+                    <tr><td colspan="5" class="empty-state">No inventory items yet. Add products before entering receipt lines.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="parts-audit-grid">
+        <div class="card table-card">
+            <div class="card-header"><strong>Purchase receipts</strong><a href="{% url 'purchase_list' %}">All purchases</a></div>
+            <div class="table-container">
+                <table class="sortable-table parts-audit-table">
+                    <thead><tr><th>Type / date</th><th>Receipt no. / party</th><th>Parts on this receipt</th><th>Recorded by</th><th>Source document</th></tr></thead>
+                    <tbody>
+                        {% for purchase in recent_purchases %}
+                        <tr>
+                            <td><strong>Purchase</strong><br>{{ purchase.document_date|default:purchase.date|date:"Y-m-d" }}</td>
+                            <td><strong>{{ purchase.invoice_number|default:"No reference" }}</strong><br>{{ purchase.supplier.name|default:"—" }}</td>
+                            <td>
+                                <ul class="receipt-detail-list">
+                                    {% for item in purchase.items.all %}<li>{{ item.product.name }} × {{ item.quantity }} @ {{ item.unit_cost|floatformat:2 }} ETB</li>{% endfor %}
+                                </ul>
+                                <small>Total: {{ purchase.total_amount|floatformat:2 }} ETB</small>
+                            </td>
+                            <td>{{ purchase.recorded_by.get_username|default:"—" }}</td>
+                            <td>{% if purchase.receipt_file %}<a href="{{ purchase.receipt_file.url }}" target="_blank" rel="noopener">Open receipt</a>{% elif purchase.source_text %}<details><summary>View entered text</summary><p>{{ purchase.source_text|linebreaksbr }}</p></details>{% else %}No attachment{% endif %}</td>
+                        </tr>
+                        {% empty %}<tr><td colspan="5" class="empty-state">No purchases match this audit filter.</td></tr>{% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% if recent_purchases.has_other_pages %}
+            <nav aria-label="Purchase receipt pages" style="display: flex; justify-content: space-between; gap: 1rem; padding: 1rem; flex-wrap: wrap;">
+                {% if recent_purchases.has_previous %}<a class="btn btn-secondary btn-sm" href="?{% if audit_query %}{{ audit_query }}&{% endif %}purchase_page={{ recent_purchases.previous_page_number }}">Previous purchases</a>{% else %}<span></span>{% endif %}
+                <span class="text-muted">Page {{ recent_purchases.number }} of {{ recent_purchases.paginator.num_pages }}</span>
+                {% if recent_purchases.has_next %}<a class="btn btn-secondary btn-sm" href="?{% if audit_query %}{{ audit_query }}&{% endif %}purchase_page={{ recent_purchases.next_page_number }}">Next purchases</a>{% endif %}
+            </nav>
+            {% endif %}
+        </div>
+        <div class="card table-card">
+            <div class="card-header"><strong>Sales receipts</strong><a href="{% url 'sales_report' %}">Sales report</a></div>
+            <div class="table-container">
+                <table class="sortable-table parts-audit-table">
+                    <thead><tr><th>Type / date</th><th>Receipt no. / buyer</th><th>Parts on this receipt</th><th>Recorded by</th><th>Source document</th></tr></thead>
+                    <tbody>
+                        {% for sale in recent_sales %}
+                        <tr>
+                            <td><strong>Sale</strong><br>{{ sale.document_date|default:sale.date|date:"Y-m-d" }}</td>
+                            <td><strong>{{ sale.receipt_reference|default:sale.get_fs_number }}</strong><br>{{ sale.customer.display_name|default:"—" }}<br><small>ERP FS: {{ sale.get_fs_number }}</small></td>
+                            <td>
+                                <ul class="receipt-detail-list">
+                                    {% for item in sale.items.all %}<li>{{ item.product.name }} × {{ item.quantity }} @ {{ item.price|floatformat:2 }} ETB</li>{% endfor %}
+                                </ul>
+                                <small>Total: {{ sale.total_amount|floatformat:2 }} ETB</small>
+                            </td>
+                            <td>{{ sale.cashier.get_username|default:"—" }}</td>
+                            <td>{% if sale.receipt_file %}<a href="{{ sale.receipt_file.url }}" target="_blank" rel="noopener">Open receipt</a>{% elif sale.source_text %}<details><summary>View entered text</summary><p>{{ sale.source_text|linebreaksbr }}</p></details>{% else %}No attachment{% endif %}</td>
+                        </tr>
+                        {% empty %}<tr><td colspan="5" class="empty-state">No sales match this audit filter.</td></tr>{% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% if recent_sales.has_other_pages %}
+            <nav aria-label="Sales receipt pages" style="display: flex; justify-content: space-between; gap: 1rem; padding: 1rem; flex-wrap: wrap;">
+                {% if recent_sales.has_previous %}<a class="btn btn-secondary btn-sm" href="?{% if audit_query %}{{ audit_query }}&{% endif %}sale_page={{ recent_sales.previous_page_number }}">Previous sales</a>{% else %}<span></span>{% endif %}
+                <span class="text-muted">Page {{ recent_sales.number }} of {{ recent_sales.paginator.num_pages }}</span>
+                {% if recent_sales.has_next %}<a class="btn btn-secondary btn-sm" href="?{% if audit_query %}{{ audit_query }}&{% endif %}sale_page={{ recent_sales.next_page_number }}">Next sales</a>{% endif %}
+            </nav>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<template id="part-line-template">
+    <tr class="part-line">
+        <td style="padding: 0.5rem;">
+            <select name="product_id[]" required class="form-input" style="width: 100%;">
+                <option value="">Select a part</option>
+                {% for product in products %}
+                <option value="{{ product.id }}">{{ product.name }}{% if product.part_number %} — {{ product.part_number }}{% elif product.sku %} — {{ product.sku }}{% endif %}</option>
+                {% endfor %}
+            </select>
+        </td>
+        <td style="padding: 0.5rem;"><input name="quantity[]" type="number" min="1" step="1" required class="form-input" style="width: 100%;"></td>
+        <td style="padding: 0.5rem;"><input name="unit_price[]" type="number" min="0.01" step="0.01" required class="form-input" style="width: 100%;"></td>
+        <td style="padding: 0.5rem;"><button type="button" class="btn btn-danger btn-sm remove-line">Remove</button></td>
+    </tr>
+</template>
+<script>
+    const lineContainer = document.getElementById("part-lines");
+    const lineTemplate = document.getElementById("part-line-template");
+    document.getElementById("add-line").addEventListener("click", () => {
+        lineContainer.appendChild(lineTemplate.content.cloneNode(true));
+    });
+    lineContainer.addEventListener("click", (event) => {
+        if (event.target.closest(".remove-line") && lineContainer.querySelectorAll(".part-line").length > 1) {
+            event.target.closest(".part-line").remove();
+        }
+    });
+    const entryType = document.getElementById("entry_type");
+    const paymentField = document.getElementById("payment-method-field");
+    const updatePaymentVisibility = () => {
+        paymentField.hidden = entryType.value !== "sale";
+    };
+    entryType.addEventListener("change", updatePaymentVisibility);
+    updatePaymentVisibility();
+</script>
+{% endblock %}

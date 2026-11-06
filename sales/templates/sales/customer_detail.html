@@ -1,49 +1,373 @@
 {% extends "base.html" %}
 
-{% block title %}Customer - {{ customer.name }}{% endblock %}
+{% block title %}{{ customer.display_name }} - Customer Profile & Fleet - {{ app_name }}{% endblock %}
+
+{% block page_title %}{{ customer.display_name }}{% endblock %}
+
+{% block extra_css %}
+<style>
+.customer-hero-card {
+    background: hsl(var(--card));
+    border: 1px solid hsl(var(--border));
+    border-radius: 12px;
+    padding: 1.75rem;
+    margin-bottom: 2rem;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+}
+.fleet-card {
+    background: hsla(var(--bg-hover) / 0.5);
+    border: 1px solid hsl(var(--border));
+    border-radius: 10px;
+    padding: 1.25rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1rem;
+    flex-wrap: wrap;
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.fleet-card:hover {
+    border-color: hsl(var(--accent));
+    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+}
+.plate-badge {
+    background: #ffffff;
+    color: #111827;
+    border: 2px solid #1f2937;
+    font-family: monospace;
+    font-weight: 800;
+    font-size: 1rem;
+    padding: 0.25rem 0.65rem;
+    border-radius: 6px;
+    letter-spacing: 1px;
+    display: inline-block;
+}
+</style>
+{% endblock %}
 
 {% block content %}
-<h1>{{ customer.name }}</h1>
-<p>
-    {% if customer.phone %}Phone: {{ customer.phone }}<br>{% endif %}
-    {% if customer.email %}Email: {{ customer.email }}<br>{% endif %}
-    {% if customer.address %}Address: {{ customer.address }}<br>{% endif %}
-    Loyalty Points: {{ customer.loyalty_points }}
-</p>
-<h2>Purchase history</h2>
-{% if sales %}
-<table class="card">
-    <thead><tr><th>ID</th><th>Date</th><th>Total</th><th>Method</th></tr></thead>
-    <tbody>
-    {% for s in sales %}
-    <tr>
-        <td><a href="{% url 'invoice' s.id %}">{{ s.id }}</a></td>
-        <td>{{ s.date|date:"M d, Y" }}</td>
-        <td>{{ s.total_amount|floatformat:2 }}</td>
-        <td>{{ s.payment_method }}</td>
-    </tr>
-    {% endfor %}
-    </tbody>
-</table>
-{% else %}
-<p>No sales yet.</p>
-{% endif %}
-<h2>Loyalty Transactions</h2>
+<!-- Top Action Bar -->
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 1rem;">
+    <div style="display: flex; gap: 0.5rem; align-items: center;">
+        <a href="{% url 'customer_list' %}" class="btn btn-secondary btn-sm">← Back to Customers</a>
+    </div>
+    <div style="display: flex; gap: 0.5rem;">
+        <a href="{% url 'pos' %}?customer={{ customer.id }}" class="btn btn-primary btn-sm">
+            🛒 Open in POS ({{ customer.name }})
+        </a>
+        <a href="{% url 'proforma_create' %}?customer_id={{ customer.id }}" class="btn btn-secondary btn-sm">
+            📄 Create Proforma
+        </a>
+        {% if request.user.is_superuser or request.user.is_staff %}
+        <a href="{% url 'customer_update' customer.id %}" class="btn btn-secondary btn-sm">Edit Profile</a>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Customer Profile Header Card -->
+<div class="customer-hero-card">
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 1.5rem;">
+        <div>
+            <h2 style="margin: 0 0 0.5rem 0; font-size: 1.35rem; color: hsl(var(--text));">
+                {{ customer.display_name }}
+            </h2>
+            {% if customer.company_name and customer.name != customer.company_name %}
+            <p style="margin: 0 0 0.5rem 0; color: hsl(var(--text-muted)); font-weight: 600;">
+                Contact Person: {{ customer.name }}
+            </p>
+            {% endif %}
+            
+            <div style="display: grid; gap: 0.35rem; font-size: 0.9rem;">
+                {% if customer.phone %}
+                <div>📞 <strong>Phone:</strong> <span style="font-family: monospace;">{{ customer.phone }}</span></div>
+                {% endif %}
+                {% if customer.email %}
+                <div>✉️ <strong>Email:</strong> {{ customer.email }}</div>
+                {% endif %}
+                {% if customer.address %}
+                <div>📍 <strong>Address:</strong> {{ customer.address }}</div>
+                {% endif %}
+            </div>
+        </div>
+
+        <div>
+            <div style="background: hsla(var(--bg-hover) / 0.5); border: 1px solid hsl(var(--border)); padding: 1rem; border-radius: 8px;">
+                <div style="font-size: 0.82rem; font-weight: 700; color: hsl(var(--text-muted)); text-transform: uppercase;">
+                    Ethiopian Tax Credentials (የግብር መረጃ)
+                </div>
+                <div style="margin-top: 0.5rem; font-size: 0.9rem;">
+                    <div>TIN Number: <strong style="font-family: monospace;">{{ customer.tin_number|default:"Not recorded" }}</strong></div>
+                    <div>VAT Reg No: <strong style="font-family: monospace;">{{ customer.vat_number|default:"Not registered" }}</strong></div>
+                </div>
+            </div>
+        </div>
+
+        <div>
+            <div style="background: hsla(var(--accent) / 0.08); border: 1px solid hsl(var(--accent)); padding: 1rem; border-radius: 8px;">
+                <div style="font-size: 0.82rem; font-weight: 700; color: hsl(var(--accent)); text-transform: uppercase;">
+                    Customer Account Summary
+                </div>
+                <div style="margin-top: 0.5rem; font-size: 0.9rem;">
+                    <div>Fleet Size: <strong>{{ vehicles.count }} vehicles</strong></div>
+                    <div>Loyalty Points: <strong>{{ customer.loyalty_points }} pts</strong></div>
+                    <div>Total Orders: <strong>{{ sales.count }} sales</strong></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ================= 2. GARAGE & FLEET VEHICLES SECTION ================= -->
+<div class="card" style="margin-bottom: 2rem; padding: 1.75rem;">
+    <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid hsl(var(--border)); padding-bottom: 0.75rem; margin-bottom: 1.25rem;">
+        <div>
+            <h3 style="margin: 0; font-size: 1.2rem; display: flex; align-items: center; gap: 0.5rem;">
+                <span>🚘</span> Customer Garage Fleet & Registered Vehicles (የደንበኛ መኪኖች)
+            </h3>
+            <p style="margin: 0.2rem 0 0 0; font-size: 0.85rem; color: hsl(var(--text-muted));">
+                Saved vehicles for regular garages, companies, and repeat car owners. Click to instantly browse compatible parts.
+            </p>
+        </div>
+        <button type="button" class="btn btn-primary btn-sm" onclick="openAddVehicleModal()">
+            + Register Vehicle to Fleet
+        </button>
+    </div>
+
+    {% if vehicles %}
+    <div style="display: grid; gap: 1rem;">
+        {% for v in vehicles %}
+        <div class="fleet-card">
+            <div style="display: flex; align-items: center; gap: 1.25rem;">
+                <div style="font-size: 2.2rem;">🚗</div>
+                <div>
+                    <div style="display: flex; align-items: center; gap: 0.75rem;">
+                        {% if v.plate_number %}
+                        <span class="plate-badge">{{ v.plate_number }}</span>
+                        {% endif %}
+                        <span style="font-size: 1.1rem; font-weight: 800; color: hsl(var(--text));">
+                            {% if v.car_model %}{{ v.car_model }}{% else %}{{ v.custom_name|default:"Registered Vehicle" }}{% endif %}
+                        </span>
+                        {% if v.manufacture_year %}
+                        <span style="font-size: 0.85rem; color: hsl(var(--text-muted)); font-weight: 600;">
+                            ({{ v.manufacture_year }})
+                        </span>
+                        {% endif %}
+                    </div>
+
+                    <div style="margin-top: 0.35rem; font-size: 0.85rem; color: hsl(var(--text-muted)); display: flex; gap: 1rem; flex-wrap: wrap;">
+                        {% if v.vin_number %}
+                        <div>VIN/Chassis: <code style="font-weight: 700;">{{ v.vin_number }}</code></div>
+                        {% endif %}
+                        {% if v.engine %}
+                        <div>Engine: <strong>{{ v.engine }}</strong></div>
+                        {% endif %}
+                        {% if v.notes %}
+                        <div>Notes: <em>{{ v.notes }}</em></div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <div style="display: flex; gap: 0.5rem; align-items: center;">
+                <a href="{% url 'pos' %}?customer={{ customer.id }}&vehicle={{ v.id }}{% if v.car_model %}&carmodel={{ v.car_model.id }}&make={{ v.car_model.make_id }}{% endif %}{% if v.vin_number %}&vin={{ v.vin_number }}{% endif %}"
+                   class="btn btn-primary btn-sm" style="font-weight: 700;">
+                    🔍 Find Parts in POS →
+                </a>
+                <form method="post" action="{% url 'customer_delete_vehicle' customer.id v.id %}" onsubmit="return confirm('Remove vehicle {{ v.plate_number }} from customer profile?');" style="margin: 0;">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-danger btn-sm" title="Delete vehicle">✕</button>
+                </form>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div style="text-align: center; padding: 2.5rem 1rem; background: hsla(var(--bg-hover) / 0.3); border: 1px dashed hsl(var(--border)); border-radius: 8px;">
+        <div style="font-size: 2.2rem; margin-bottom: 0.5rem;">🚘</div>
+        <p style="font-weight: 700; margin: 0;">No vehicles registered for this customer yet.</p>
+        <p style="font-size: 0.85rem; color: hsl(var(--text-muted)); margin-top: 0.25rem;">
+            Registering customer vehicles allows 1-click fitment verification and easy reordering when garages return.
+        </p>
+        <button type="button" class="btn btn-primary btn-sm" style="margin-top: 0.75rem;" onclick="openAddVehicleModal()">
+            + Register First Vehicle
+        </button>
+    </div>
+    {% endif %}
+</div>
+
+<!-- ================= 3. PURCHASE HISTORY ================= -->
+<div class="card" style="margin-bottom: 2rem; padding: 1.75rem;">
+    <h3 style="margin-top: 0; margin-bottom: 1.25rem; font-size: 1.2rem; border-bottom: 1px solid hsl(var(--border)); padding-bottom: 0.75rem;">
+        📜 Purchase & Invoice History
+    </h3>
+    {% if sales %}
+    <div class="table-container">
+        <table class="table" style="width: 100%;">
+            <thead>
+                <tr>
+                    <th>Invoice / FS #</th>
+                    <th>Date</th>
+                    <th>Vehicle Serviced</th>
+                    <th>Payment Method</th>
+                    <th style="text-align: right;">Total Amount</th>
+                    <th style="text-align: center;">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for s in sales %}
+                <tr>
+                    <td>
+                        <a href="{% url 'invoice' s.id %}" style="font-weight: 800; text-decoration: underline; color: inherit; font-family: monospace;">
+                            {{ s.fs_number }}
+                        </a>
+                    </td>
+                    <td style="color: hsl(var(--text-muted)); font-size: 0.88rem;">{{ s.date|date:"Y-m-d H:i" }}</td>
+                    <td>
+                        {% if s.vehicle %}
+                        <span style="font-weight: 600;">🚗 {{ s.vehicle.display_title }}</span>
+                        {% else %}
+                        <span style="color: hsl(var(--text-muted));">—</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <span style="font-size: 0.85rem; font-weight: 600;">{{ s.get_payment_method_display }}</span>
+                    </td>
+                    <td style="text-align: right; font-family: monospace; font-weight: 800; color: hsl(var(--accent)); font-size: 1.05rem;">
+                        {{ s.total_amount|floatformat:2 }} ETB
+                    </td>
+                    <td style="text-align: center;">
+                        <a href="{% url 'invoice' s.id %}" class="btn btn-secondary btn-sm">View</a>
+                        <a href="{% url 'invoice_pdf' s.id %}" class="btn btn-secondary btn-sm" target="_blank">PDF</a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <p style="color: hsl(var(--text-muted));">No sales recorded for this customer yet.</p>
+    {% endif %}
+</div>
+
+<!-- ================= 4. LOYALTY POINTS HISTORY ================= -->
 {% if transactions %}
-<table class="card">
-    <thead><tr><th>Date</th><th>Type</th><th>Points</th><th>Description</th></tr></thead>
-    <tbody>
-    {% for t in transactions %}
-    <tr>
-        <td>{{ t.date|date:"M d, Y H:i" }}</td>
-        <td>{{ t.get_transaction_type_display }}</td>
-        <td>{{ t.points }}</td>
-        <td>{{ t.description }}</td>
-    </tr>
-    {% endfor %}
-    </tbody>
-</table>
-{% else %}
-<p>No loyalty transactions yet.</p>
+<div class="card" style="padding: 1.75rem;">
+    <h3 style="margin-top: 0; margin-bottom: 1.25rem; font-size: 1.2rem; border-bottom: 1px solid hsl(var(--border)); padding-bottom: 0.75rem;">
+        ⭐ Loyalty Points Log
+    </h3>
+    <div class="table-container">
+        <table class="table" style="width: 100%;">
+            <thead>
+                <tr>
+                    <th>Date</th>
+                    <th>Type</th>
+                    <th>Points</th>
+                    <th>Description</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for t in transactions %}
+                <tr>
+                    <td style="color: hsl(var(--text-muted));">{{ t.date|date:"Y-m-d H:i" }}</td>
+                    <td><strong>{{ t.get_transaction_type_display }}</strong></td>
+                    <td style="font-family: monospace; font-weight: 800; color: #10b981;">+{{ t.points }}</td>
+                    <td>{{ t.description }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
 {% endif %}
+
+<!-- ================= MODAL: ADD VEHICLE TO CUSTOMER FLEET ================= -->
+<div id="vehicle-modal" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 1000; align-items: center; justify-content: center; padding: 1.5rem;">
+    <div style="background: hsl(var(--card)); max-width: 540px; width: 100%; border-radius: 12px; border: 1px solid hsl(var(--border)); padding: 2rem; box-shadow: 0 10px 25px rgba(0,0,0,0.2);">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem; border-bottom: 1px solid hsl(var(--border)); padding-bottom: 0.75rem;">
+            <h3 style="margin: 0; font-size: 1.15rem; display: flex; align-items: center; gap: 0.5rem;">
+                <span>🚗</span> Register Vehicle to {{ customer.name }}'s Fleet
+            </h3>
+            <button type="button" onclick="closeAddVehicleModal()" style="background: none; border: none; font-size: 1.4rem; cursor: pointer; color: hsl(var(--text-muted));">✕</button>
+        </div>
+
+        <form method="post" action="{% url 'customer_add_vehicle' customer.id %}">
+            {% csrf_token %}
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
+                <div>
+                    <label style="font-size: 0.82rem; font-weight: 700; display: block; margin-bottom: 0.3rem;">
+                        Plate Number (የሰሌዳ ቁጥር) *
+                    </label>
+                    <input type="text" name="plate_number" placeholder="e.g. 2-B12345 AA" required class="form-input" style="font-family: monospace; font-weight: 700; text-transform: uppercase;">
+                </div>
+                <div>
+                    <label style="font-size: 0.82rem; font-weight: 700; display: block; margin-bottom: 0.3rem;">
+                        VIN / Chassis Prefix
+                    </label>
+                    <input type="text" name="vin_number" placeholder="e.g. JTDKN... or KUN25" class="form-input" style="font-family: monospace; font-weight: 700; text-transform: uppercase;">
+                </div>
+            </div>
+
+            <div style="margin-bottom: 1rem;">
+                <label style="font-size: 0.82rem; font-weight: 700; display: block; margin-bottom: 0.3rem;">
+                    Select Standard Car Model (from catalog)
+                </label>
+                <select name="car_model_id" class="form-input">
+                    <option value="">-- Choose Car Make & Model --</option>
+                    {% for m in car_makes %}
+                        <optgroup label="{{ m.name }}">
+                            {% for mod in m.models.all %}
+                            <option value="{{ mod.id }}">
+                                {{ m.name }} {{ mod.name }} ({{ mod.year_from|default:'' }}–{{ mod.year_to|default:'Present' }})
+                            </option>
+                            {% endfor %}
+                        </optgroup>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div style="margin-bottom: 1rem;">
+                <label style="font-size: 0.82rem; font-weight: 700; display: block; margin-bottom: 0.3rem;">
+                    Or Custom Model Name (if not in catalog above)
+                </label>
+                <input type="text" name="custom_name" placeholder="e.g. Toyota Hilux 2.8L Double Cab" class="form-input">
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
+                <div>
+                    <label style="font-size: 0.82rem; font-weight: 600; display: block; margin-bottom: 0.3rem;">
+                        Manufacture Year
+                    </label>
+                    <input type="number" name="manufacture_year" placeholder="e.g. 2018" min="1970" max="2030" class="form-input">
+                </div>
+                <div>
+                    <label style="font-size: 0.82rem; font-weight: 600; display: block; margin-bottom: 0.3rem;">
+                        Engine Type / Code
+                    </label>
+                    <input type="text" name="engine" placeholder="e.g. 1GD-FTV Diesel" class="form-input">
+                </div>
+            </div>
+
+            <div style="margin-bottom: 1.5rem;">
+                <label style="font-size: 0.82rem; font-weight: 600; display: block; margin-bottom: 0.3rem;">
+                    Garage Notes / Assigned Driver
+                </label>
+                <input type="text" name="notes" placeholder="e.g. Assigned driver: Chala, Needs 5W-30 synthetic oil" class="form-input">
+            </div>
+
+            <div style="display: flex; justify-content: flex-end; gap: 0.75rem; border-top: 1px solid hsl(var(--border)); padding-top: 1rem;">
+                <button type="button" class="btn btn-secondary" onclick="closeAddVehicleModal()">Cancel</button>
+                <button type="submit" class="btn btn-primary" style="font-weight: 700;">✓ Save to Garage Fleet</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+function openAddVehicleModal() {
+    document.getElementById('vehicle-modal').style.display = 'flex';
+}
+function closeAddVehicleModal() {
+    document.getElementById('vehicle-modal').style.display = 'none';
+}
+</script>
 {% endblock %}

@@ -1,0 +1,111 @@
+{% extends "base.html" %}
+
+{% block title %}Proforma Invoices (የዋጋ ማቅረቢያ ፕሮፎርማ) - {{ app_name }}{% endblock %}
+
+{% block page_title %}Proforma Invoices & Quotations{% endblock %}
+
+{% block content %}
+<div class="header-actions" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 1rem;">
+    <div style="display: flex; gap: 0.5rem; align-items: center;">
+        <form method="get" style="display: flex; gap: 0.5rem;">
+            <input type="text" name="q" value="{{ search_query }}" placeholder="Search by PRF #, customer, TIN, part..." class="form-input" style="min-width: 280px;">
+            <select name="status" class="form-select" onchange="this.form.submit()">
+                <option value="">All Statuses (ሁሉም)</option>
+                <option value="SENT" {% if status_filter == 'SENT' %}selected{% endif %}>Issued / Active (የተሰጠ)</option>
+                <option value="CONVERTED" {% if status_filter == 'CONVERTED' %}selected{% endif %}>Converted to Sale (የተሸጠ)</option>
+                <option value="DRAFT" {% if status_filter == 'DRAFT' %}selected{% endif %}>Draft (ረቂቅ)</option>
+                <option value="EXPIRED" {% if status_filter == 'EXPIRED' %}selected{% endif %}>Expired (ያለፈበት)</option>
+            </select>
+            <button type="submit" class="btn">Filter</button>
+            {% if search_query or status_filter %}
+            <a href="{% url 'proforma_list' %}" class="btn btn-secondary">Clear</a>
+            {% endif %}
+        </form>
+    </div>
+
+    <div>
+        <a href="{% url 'proforma_create' %}" class="btn" style="background: #0f766e; color: #ffffff; font-weight: 700; display: inline-flex; align-items: center; gap: 0.4rem;">
+            <span>➕</span> Create New Proforma (አዲስ ፕሮፎርማ)
+        </a>
+    </div>
+</div>
+
+<div class="card" style="padding: 0; overflow: hidden;">
+    <div class="table-container">
+        <table class="sortable-table">
+            <thead>
+                <tr>
+                    <th style="padding-left: 1.5rem;">Proforma #</th>
+                    <th>Date Issued</th>
+                    <th>Valid Until</th>
+                    <th>Customer / Buyer Company</th>
+                    <th>Buyer TIN</th>
+                    <th>Items Count</th>
+                    <th style="text-align: right;">Total (ETB)</th>
+                    <th style="text-align: center;">Status</th>
+                    <th style="text-align: right; padding-right: 1.5rem;">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for p in proformas %}
+                <tr>
+                    <td style="padding-left: 1.5rem;">
+                        <a href="{% url 'proforma_detail' p.id %}" style="font-weight: 800; font-family: monospace; color: #0f766e; text-decoration: none;">
+                            {{ p.proforma_number }}
+                        </a>
+                    </td>
+                    <td>{{ p.date|date:"d/m/Y" }}</td>
+                    <td>
+                        <span style="color: {% if p.valid_until < today %}#ef4444{% else %}inherit{% endif %}; font-weight: 600;">
+                            {{ p.valid_until|date:"d/m/Y" }}
+                        </span>
+                    </td>
+                    <td>
+                        <strong>{{ p.buyer_company|default:p.buyer_name }}</strong>
+                        {% if p.buyer_company and p.buyer_name %}
+                        <div style="font-size: 0.8rem; color: hsl(var(--text-muted));">Attn: {{ p.buyer_name }}</div>
+                        {% endif %}
+                    </td>
+                    <td style="font-family: monospace; font-size: 0.85rem;">{{ p.buyer_tin|default:"—" }}</td>
+                    <td>{{ p.items.count }} part(s)</td>
+                    <td style="text-align: right; font-weight: 800; font-family: monospace; color: hsl(var(--text));">
+                        {{ p.total_amount|floatformat:2 }} ETB
+                    </td>
+                    <td style="text-align: center;">
+                        {% if p.status == 'CONVERTED' %}
+                        <span class="badge badge-ok" style="font-size: 0.78rem;">✓ Sold / Converted</span>
+                        {% elif p.status == 'SENT' %}
+                        <span class="badge" style="background: #e0f2fe; color: #0369a1; font-size: 0.78rem;">Active Quotation</span>
+                        {% else %}
+                        <span class="badge badge-secondary" style="font-size: 0.78rem;">{{ p.status }}</span>
+                        {% endif %}
+                    </td>
+                    <td style="text-align: right; padding-right: 1.5rem; white-space: nowrap;">
+                        <a href="{% url 'proforma_detail' p.id %}" class="btn btn-secondary btn-sm" title="View Printable Proforma">
+                            👁️ View / Print
+                        </a>
+                        <a href="{% url 'proforma_pdf' p.id %}" target="_blank" class="btn btn-secondary btn-sm" title="Download PDF">
+                            📄 PDF
+                        </a>
+                        {% if p.status != 'CONVERTED' %}
+                        <a href="{% url 'proforma_convert' p.id %}" class="btn btn-sm" style="background: #16a34a; color: white;" onclick="return confirm('Convert this proforma into an active sale? Stock will be deducted and invoice generated.')" title="Convert to Sale">
+                            ✓ Make Sale
+                        </a>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="9" style="text-align: center; padding: 4rem 1rem; color: hsl(var(--text-muted));">
+                        <div style="font-size: 2.5rem; margin-bottom: 0.5rem;">📝</div>
+                        <p style="font-size: 1.05rem; font-weight: 600; margin: 0 0 0.5rem 0;">No Proforma Invoices Found</p>
+                        <p style="margin: 0 0 1.25rem 0; font-size: 0.9rem;">Generate professional price quotations for your retail and corporate customers.</p>
+                        <a href="{% url 'proforma_create' %}" class="btn btn-primary">➕ Create First Proforma</a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

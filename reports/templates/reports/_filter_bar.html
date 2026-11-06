@@ -1,0 +1,45 @@
+<!-- Reusable Financial Period Filter Bar -->
+<div class="card" style="margin-bottom: 1.5rem; padding: 1.25rem;">
+    <form method="get" id="report-filter-form" style="display: flex; flex-wrap: wrap; gap: 1rem; align-items: flex-end; justify-content: space-between;">
+        
+        <!-- Preset Buttons -->
+        <div style="display: flex; flex-wrap: wrap; gap: 0.4rem; align-items: center;">
+            <span style="font-size: 0.85rem; font-weight: 700; color: hsl(var(--text-muted)); margin-right: 0.25rem;">Period:</span>
+            <a href="?period=today" class="btn btn-sm {% if preset == 'today' %}btn-primary{% else %}btn-secondary{% endif %}">Today</a>
+            <a href="?period=this_week" class="btn btn-sm {% if preset == 'this_week' %}btn-primary{% else %}btn-secondary{% endif %}">This Week</a>
+            <a href="?period=this_month" class="btn btn-sm {% if preset == 'this_month' %}btn-primary{% else %}btn-secondary{% endif %}">This Month</a>
+            <a href="?period=this_quarter" class="btn btn-sm {% if preset == 'this_quarter' %}btn-primary{% else %}btn-secondary{% endif %}">This Quarter</a>
+            <a href="?period=this_year" class="btn btn-sm {% if preset == 'this_year' %}btn-primary{% else %}btn-secondary{% endif %}">This Year</a>
+            <a href="?period=last_month" class="btn btn-sm {% if preset == 'last_month' %}btn-primary{% else %}btn-secondary{% endif %}">Last Month</a>
+        </div>
+
+        <!-- Custom Date Range -->
+        <div style="display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: flex-end;">
+            <div style="display: flex; flex-direction: column; gap: 0.25rem;">
+                <label style="font-size: 0.75rem; font-weight: 600; color: hsl(var(--text-muted)); margin: 0;">From</label>
+                <input type="date" name="date_from" value="{{ start_date|date:'Y-m-d' }}" class="form-input" style="padding: 0.35rem 0.6rem; font-size: 0.85rem;">
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 0.25rem;">
+                <label style="font-size: 0.75rem; font-weight: 600; color: hsl(var(--text-muted)); margin: 0;">To</label>
+                <input type="date" name="date_to" value="{{ end_date|date:'Y-m-d' }}" class="form-input" style="padding: 0.35rem 0.6rem; font-size: 0.85rem;">
+            </div>
+            <button type="submit" class="btn btn-sm">Filter</button>
+            {% if preset != 'this_month' %}
+            <a href="?period=this_month" class="btn btn-secondary btn-sm" title="Reset to current month">Reset</a>
+            {% endif %}
+        </div>
+    </form>
+
+    <!-- Active Filter Info Pill -->
+    <div style="margin-top: 0.75rem; padding-top: 0.6rem; border-top: 1px dashed hsl(var(--border)); display: flex; justify-content: space-between; align-items: center; font-size: 0.82rem; color: hsl(var(--text-muted));">
+        <div>
+            <span>📅 Showing data for: <strong style="color: hsl(var(--foreground));">{{ start_date|date:"M d, Y" }} — {{ end_date|date:"M d, Y" }}</strong></span>
+            {% if prev_start %}
+            <span style="margin-left: 1rem; opacity: 0.8;">(Prior comparison period: {{ prev_start|date:"M d" }} — {{ prev_end|date:"M d, Y" }})</span>
+            {% endif %}
+        </div>
+        <div>
+            <span>Currency: <strong style="color: hsl(var(--accent));">ETB (Ethiopian Birr)</strong></span>
+        </div>
+    </div>
+</div>

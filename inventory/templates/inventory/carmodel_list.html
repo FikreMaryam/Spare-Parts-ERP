@@ -1,0 +1,391 @@
+{% extends "base.html" %}
+
+{% block title %}Car Models & Vehicle Compatibilities - {{ app_name }}{% endblock %}
+
+{% block page_title %}Car Models & Compatibilities{% endblock %}
+
+{% block content %}
+<div class="header-actions" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 1rem;">
+    <div>
+        <p class="text-muted m-0">
+            Browse and manage <strong>{{ total_models }}</strong> car models across <strong>{{ total_makes }}</strong> vehicle manufacturers. Click any brand to expand its car models.
+        </p>
+    </div>
+    <div style="display: flex; gap: 0.75rem;">
+        {% if request.user.is_superuser %}
+        <a href="{% url 'carmodel_create' %}" class="btn btn-sm">+ Add New Car Model</a>
+        <a href="{% url 'carmake_create' %}" class="btn btn-secondary btn-sm">+ Add Car Brand</a>
+        {% endif %}
+    </div>
+</div>
+
+<div class="card" style="margin-bottom: 1.5rem; padding: 1.25rem 1.75rem;">
+    <div class="browser-toolbar">
+        <div class="search-box-wrapper" style="position: relative; flex: 1; min-width: 280px;">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="position: absolute; left: 1rem; top: 50%; transform: translateY(-50%); width: 1.15rem; height: 1.15rem; color: hsl(var(--text-muted)); pointer-events: none;"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+            <input type="text" id="modelFilterInput" placeholder="Filter by brand, model, engine or chassis (e.g. Toyota, Corolla, ZRE152, Y62, D-Max)..." oninput="filterCarBrowser()" style="width: 100%; padding: 0.75rem 1rem 0.75rem 2.75rem; background: hsl(var(--bg)); border: 1px solid hsl(var(--border)); border-radius: 30px; color: hsl(var(--text)); font-size: 0.95rem;">
+        </div>
+        <div class="toolbar-btns" style="display: flex; gap: 0.5rem; align-items: center;">
+            <button type="button" class="btn btn-secondary btn-sm" onclick="expandAllMakes()">Expand All</button>
+            <button type="button" class="btn btn-secondary btn-sm" onclick="collapseAllMakes()">Collapse All</button>
+            <span class="selection-pill" id="browserSelectionPill" style="display: none; background: hsla(var(--accent) / 0.15); color: hsl(var(--accent)); padding: 0.35rem 0.85rem; border-radius: 20px; font-weight: 700; font-size: 0.85rem;">0 selected</span>
+        </div>
+    </div>
+</div>
+
+<!-- Makes & Models Accordion List -->
+<div class="browser-accordion" id="browserAccordion">
+    {% for make in makes %}
+    <div class="make-browser-card" data-make-name="{{ make.name|lower }}" id="browser-make-{{ make.id }}">
+        <!-- Clickable Header: click to expand / shorten -->
+        <div class="make-browser-header" onclick="toggleBrowserMake('browser-body-{{ make.id }}', 'arrow-bm-{{ make.id }}')">
+            <div class="make-header-left">
+                <span class="accordion-arrow" id="arrow-bm-{{ make.id }}">▶</span>
+                <span class="brand-avatar">🚗</span>
+                <span class="brand-title">{{ make.name }}</span>
+                <span class="brand-count-badge">{{ make.models.count }} models</span>
+            </div>
+            <div class="make-header-right" onclick="event.stopPropagation()">
+                <label class="select-all-brand-label">
+                    <input type="checkbox" class="brand-select-all" data-target="browser-body-{{ make.id }}" onchange="handleBrowserSelectAll(this)">
+                    <span>Select All</span>
+                </label>
+                {% if request.user.is_superuser %}
+                <a href="{% url 'carmake_update' make.id %}" class="btn btn-secondary btn-sm" style="padding: 0.25rem 0.6rem; font-size: 0.75rem;">Edit Brand</a>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Models Container (Shortened by default) -->
+        <div class="make-browser-body" id="browser-body-{{ make.id }}" style="display: none;">
+            <div class="models-table-container">
+                <table class="browser-table">
+                    <thead>
+                        <tr>
+                            <th style="width: 40px;">
+                                <span class="text-xs">Select</span>
+                            </th>
+                            <th>Model Name</th>
+                            <th>Years</th>
+                            <th>Engine Type</th>
+                            <th>Chassis / VIN Prefixes</th>
+                            {% if request.user.is_superuser %}
+                            <th class="actions-col" style="text-align: right;">Actions</th>
+                            {% endif %}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for cm in make.models.all %}
+                        <tr class="model-browser-row" data-search="{{ make.name|lower }} {{ cm.name|lower }} {{ cm.chassis_prefixes|lower }} {{ cm.engine_type|lower }} {{ cm.year_from }} {{ cm.year_to }}">
+                            <td class="checkbox-cell">
+                                <input type="checkbox" class="browser-model-checkbox" value="{{ cm.id }}" onchange="updateBrowserSelection()">
+                            </td>
+                            <td class="fw-700 text-primary">
+                                {{ cm.name }}
+                            </td>
+                            <td>
+                                <span class="year-badge">
+                                    {% if cm.year_from and cm.year_to %}
+                                        {{ cm.year_from }}–{{ cm.year_to }}
+                                    {% elif cm.year_from %}
+                                        {{ cm.year_from }}+
+                                    {% else %}
+                                        —
+                                    {% endif %}
+                                </span>
+                            </td>
+                            <td class="text-muted text-sm">
+                                {{ cm.engine_type|default:"—" }}
+                            </td>
+                            <td>
+                                {% if cm.chassis_prefixes %}
+                                <code class="chassis-code">{{ cm.chassis_prefixes }}</code>
+                                {% else %}
+                                <span class="text-muted">—</span>
+                                {% endif %}
+                            </td>
+                            {% if request.user.is_superuser %}
+                            <td class="actions-col" style="text-align: right;">
+                                <a href="{% url 'carmodel_update' cm.id %}" class="btn btn-secondary btn-sm" style="padding: 0.2rem 0.5rem; font-size: 0.8rem;">Edit</a>
+                                <a href="{% url 'carmodel_delete' cm.id %}" class="btn btn-danger btn-sm" style="padding: 0.2rem 0.5rem; font-size: 0.8rem;">Delete</a>
+                            </td>
+                            {% endif %}
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="6" class="text-muted text-center" style="padding: 1.5rem;">
+                                No models configured under {{ make.name }}.
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    {% empty %}
+    <div class="card empty-state">
+        <p>No car makes found. Click "Add Car Brand" to begin.</p>
+    </div>
+    {% endfor %}
+</div>
+
+<style>
+.browser-toolbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+.browser-accordion {
+    display: flex;
+    flex-direction: column;
+    gap: 0.85rem;
+}
+.make-browser-card {
+    border: 1px solid hsl(var(--border));
+    border-radius: var(--radius-md, 10px);
+    background: hsl(var(--surface));
+    overflow: hidden;
+    transition: all 0.2s ease;
+}
+.make-browser-card:hover {
+    border-color: hsl(var(--accent));
+}
+.make-browser-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem 1.5rem;
+    background: hsla(var(--bg-hover) / 0.5);
+    cursor: pointer;
+    user-select: none;
+    transition: background 0.15s ease;
+}
+.make-browser-header:hover {
+    background: hsla(var(--bg-hover) / 0.85);
+}
+.make-header-left {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+.accordion-arrow {
+    display: inline-block;
+    font-size: 0.75rem;
+    color: hsl(var(--text-muted));
+    transition: transform 0.2s ease;
+    width: 14px;
+    text-align: center;
+}
+.accordion-arrow.open {
+    transform: rotate(90deg);
+}
+.brand-avatar {
+    font-size: 1.25rem;
+}
+.brand-title {
+    font-size: 1.15rem;
+    font-weight: 700;
+    color: hsl(var(--text));
+}
+.brand-count-badge {
+    background: hsla(var(--text-muted) / 0.12);
+    color: hsl(var(--text-muted));
+    font-size: 0.8rem;
+    font-weight: 600;
+    padding: 0.2rem 0.65rem;
+    border-radius: 12px;
+}
+.make-header-right {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+.select-all-brand-label {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: hsl(var(--text-muted));
+    cursor: pointer;
+}
+.select-all-brand-label input[type="checkbox"] {
+    accent-color: hsl(var(--accent));
+    width: 16px;
+    height: 16px;
+    cursor: pointer;
+}
+
+/* Models Table */
+.make-browser-body {
+    border-top: 1px solid hsl(var(--border));
+    background: hsl(var(--bg));
+}
+.models-table-container {
+    overflow-x: auto;
+}
+.browser-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+.browser-table th {
+    background: hsla(var(--bg-hover) / 0.3);
+    padding: 0.75rem 1rem;
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: hsl(var(--text-muted));
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    border-bottom: 1px solid hsl(var(--border));
+    text-align: left;
+}
+.browser-table td {
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid hsla(var(--border) / 0.6);
+    font-size: 0.9rem;
+    vertical-align: middle;
+}
+.browser-table tr:last-child td {
+    border-bottom: none;
+}
+.browser-table tr:hover {
+    background: hsla(var(--bg-hover) / 0.4);
+}
+.checkbox-cell {
+    width: 40px;
+    text-align: center;
+}
+.browser-model-checkbox {
+    accent-color: hsl(var(--accent));
+    width: 17px;
+    height: 17px;
+    cursor: pointer;
+}
+.year-badge {
+    background: hsla(var(--accent) / 0.1);
+    color: hsl(var(--accent));
+    padding: 0.2rem 0.5rem;
+    border-radius: 6px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    white-space: nowrap;
+}
+.chassis-code {
+    background: hsla(var(--bg-hover) / 0.8);
+    border: 1px solid hsl(var(--border));
+    padding: 0.2rem 0.45rem;
+    border-radius: 4px;
+    font-size: 0.82rem;
+    color: hsl(var(--text));
+}
+</style>
+
+<script>
+// Toggle individual make accordion
+function toggleBrowserMake(bodyId, arrowId) {
+    const body = document.getElementById(bodyId);
+    const arrow = document.getElementById(arrowId);
+    if (!body || !arrow) return;
+
+    if (body.style.display === 'none' || body.style.display === '') {
+        body.style.display = 'block';
+        arrow.classList.add('open');
+    } else {
+        body.style.display = 'none';
+        arrow.classList.remove('open');
+    }
+}
+
+// Expand All Makes
+function expandAllMakes() {
+    document.querySelectorAll('.make-browser-body').forEach(body => {
+        body.style.display = 'block';
+    });
+    document.querySelectorAll('.accordion-arrow').forEach(arrow => {
+        arrow.classList.add('open');
+    });
+}
+
+// Collapse All Makes
+function collapseAllMakes() {
+    document.querySelectorAll('.make-browser-body').forEach(body => {
+        body.style.display = 'none';
+    });
+    document.querySelectorAll('.accordion-arrow').forEach(arrow => {
+        arrow.classList.remove('open');
+    });
+}
+
+// Select all checkboxes for a specific brand
+function handleBrowserSelectAll(checkbox) {
+    const targetBodyId = checkbox.getAttribute('data-target');
+    const body = document.getElementById(targetBodyId);
+    if (!body) return;
+
+    // Expand make if collapsed
+    body.style.display = 'block';
+    const arrowId = targetBodyId.replace('browser-body-', 'arrow-bm-');
+    const arrow = document.getElementById(arrowId);
+    if (arrow) arrow.classList.add('open');
+
+    const checkboxes = body.querySelectorAll('.browser-model-checkbox');
+    checkboxes.forEach(cb => {
+        cb.checked = checkbox.checked;
+    });
+
+    updateBrowserSelection();
+}
+
+// Update selection counter
+function updateBrowserSelection() {
+    const checked = document.querySelectorAll('.browser-model-checkbox:checked');
+    const pill = document.getElementById('browserSelectionPill');
+    if (!pill) return;
+
+    if (checked.length > 0) {
+        pill.style.display = 'inline-block';
+        pill.textContent = checked.length + ' model(s) selected';
+    } else {
+        pill.style.display = 'none';
+    }
+}
+
+// Live search/filter across makes and models
+function filterCarBrowser() {
+    const query = document.getElementById('modelFilterInput').value.trim().toLowerCase();
+
+    document.querySelectorAll('.make-browser-card').forEach(card => {
+        const makeName = card.getAttribute('data-make-name') || '';
+        const body = card.querySelector('.make-browser-body');
+        const arrow = card.querySelector('.accordion-arrow');
+        const rows = card.querySelectorAll('.model-browser-row');
+
+        let makeMatches = makeName.includes(query);
+        let anyRowMatched = false;
+
+        rows.forEach(row => {
+            const searchData = (row.getAttribute('data-search') || '').toLowerCase();
+            if (!query || makeMatches || searchData.includes(query)) {
+                row.style.display = '';
+                anyRowMatched = true;
+            } else {
+                row.style.display = 'none';
+            }
+        });
+
+        if (!query) {
+            card.style.display = 'block';
+        } else if (makeMatches || anyRowMatched) {
+            card.style.display = 'block';
+            if (body) body.style.display = 'block';
+            if (arrow) arrow.classList.add('open');
+        } else {
+            card.style.display = 'none';
+        }
+    });
+}
+</script>
+{% endblock %}

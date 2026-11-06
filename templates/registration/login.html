@@ -3,24 +3,21 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Login - ERP My Shop</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <title>Login - {{ app_name }}</title>
     <style>
         :root {
-            --bg: #0f0f12;
-            --bg-card: #18181c;
-            --accent: #6366f1;
-            --accent-hover: #818cf8;
+            --bg: #111318;
+            --bg-card: #191c22;
+            --accent: #0f766e;
+            --accent-hover: #14b8a6;
             --text: #f4f4f5;
             --text-muted: #a1a1aa;
-            --border: #27272a;
+            --border: #2a2e36;
             --error: #ef4444;
         }
         * { box-sizing: border-box; }
         body {
-            font-family: 'DM Sans', sans-serif;
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
             background: var(--bg);
             color: var(--text);
             margin: 0;
@@ -33,20 +30,20 @@
         .login-box {
             background: var(--bg-card);
             border: 1px solid var(--border);
-            border-radius: 16px;
-            padding: 2.5rem;
+            border-radius: 14px;
+            padding: 2rem;
             width: 100%;
             max-width: 380px;
-            box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5);
         }
         .login-box h1 {
-            margin: 0 0 0.5rem 0;
-            font-size: 1.5rem;
+            margin: 0 0 0.35rem 0;
+            font-size: 1.35rem;
+            letter-spacing: -0.03em;
         }
         .login-box .subtitle {
             color: var(--text-muted);
             font-size: 0.9rem;
-            margin-bottom: 2rem;
+            margin-bottom: 1.5rem;
         }
         .form-group {
             margin-bottom: 1.25rem;
@@ -70,25 +67,55 @@
             outline: none;
             border-color: var(--accent);
         }
+        .password-wrapper {
+            position: relative;
+            display: flex;
+            align-items: center;
+        }
+        .password-wrapper input {
+            padding-right: 2.75rem;
+        }
+        .toggle-password {
+            position: absolute;
+            right: 0.75rem;
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            cursor: pointer;
+            padding: 0.25rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: color 0.15s ease;
+        }
+        .toggle-password:hover {
+            color: var(--text);
+        }
         .btn-login {
             width: 100%;
-            padding: 0.85rem;
+            padding: 0.75rem;
             background: var(--accent);
             color: white;
             border: none;
             border-radius: 8px;
-            font-size: 1rem;
-            font-weight: 600;
+            font-size: 0.95rem;
+            font-weight: 650;
             cursor: pointer;
             margin-top: 0.5rem;
         }
         .btn-login:hover { background: var(--accent-hover); }
-        .errorlist {
-            color: var(--error);
-            list-style: none;
-            padding: 0;
-            margin: 0 0 1rem 0;
-            font-size: 0.9rem;
+        .alert-error {
+            background-color: rgba(239, 68, 68, 0.12);
+            border: 1px solid rgba(239, 68, 68, 0.4);
+            color: #f87171;
+            padding: 0.75rem 1rem;
+            border-radius: 8px;
+            font-size: 0.875rem;
+            margin-bottom: 1.25rem;
+            display: flex;
+            align-items: center;
+            gap: 0.6rem;
+            line-height: 1.4;
         }
         .links {
             margin-top: 1.5rem;
@@ -104,17 +131,21 @@
 </head>
 <body>
     <div class="login-box">
-        <h1>ERP My Shop</h1>
-        <p class="subtitle">Sign in to continue</p>
+        <h1>{{ app_name }}</h1>
+        <p class="subtitle">Sign in to your shop</p>
 
-        {% if form.errors %}
-        <ul class="errorlist">
-            {% for field, errors in form.errors.items %}
-                {% for error in errors %}
-                <li>{{ error }}</li>
-                {% endfor %}
+        {% if messages %}
+            {% for message in messages %}
+            <div class="alert-error">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+                <span>{{ message }}</span>
+            </div>
             {% endfor %}
-        </ul>
+        {% elif form.errors %}
+            <div class="alert-error">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+                <span>Incorrect username or password. Please check your credentials and try again.</span>
+            </div>
         {% endif %}
 
         <form method="post">
@@ -125,7 +156,15 @@
             </div>
             <div class="form-group">
                 <label for="id_password">Password</label>
-                <input type="password" name="password" id="id_password" required placeholder="Enter your password">
+                <div class="password-wrapper">
+                    <input type="password" name="password" id="id_password" required placeholder="Enter your password">
+                    <button type="button" class="toggle-password" id="togglePassword" title="Show/Hide Password" aria-label="Toggle password visibility">
+                        <svg id="eyeIcon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                            <circle cx="12" cy="12" r="3"></circle>
+                        </svg>
+                    </button>
+                </div>
             </div>
             <input type="hidden" name="next" value="{{ next }}">
             <button type="submit" class="btn-login">Sign In</button>
@@ -134,5 +173,24 @@
             <a href="{% url 'home' %}">← Back to Home</a>
         </div>
     </div>
+
+    <script>
+        const toggleBtn = document.getElementById('togglePassword');
+        const passwordInput = document.getElementById('id_password');
+        const eyeIcon = document.getElementById('eyeIcon');
+
+        if (toggleBtn && passwordInput) {
+            toggleBtn.addEventListener('click', function() {
+                const isPassword = passwordInput.getAttribute('type') === 'password';
+                passwordInput.setAttribute('type', isPassword ? 'text' : 'password');
+                
+                if (isPassword) {
+                    eyeIcon.innerHTML = '<path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path><line x1="1" y1="1" x2="23" y2="23"></line>';
+                } else {
+                    eyeIcon.innerHTML = '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle>';
+                }
+            });
+        }
+    </script>
 </body>
 </html>

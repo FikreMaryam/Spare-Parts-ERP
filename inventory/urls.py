@@ -6,12 +6,19 @@ urlpatterns = [
     path("export/", views.export_inventory, name="export_inventory"),
     path("import/", views.import_inventory, name="import_inventory"),
     path("warehouses/", views.warehouse_list, name="warehouse_list"),
+    path("transfer/", views.transfer_stock, name="transfer_stock"),
+    path("imports/", views.import_shipments_list, name="import_shipments_list"),
+    path("imports/create/", views.import_shipment_create, name="import_shipment_create"),
+    path("imports/<int:pk>/", views.import_shipment_detail, name="import_shipment_detail"),
+    path("imports/<int:pk>/receive/", views.import_shipment_receive, name="import_shipment_receive"),
     path("stock/", views.stockmovement_list, name="stockmovement_list"),
     path("attributes/", views.attributes_dashboard, name="inventory_attributes"),
     path("purchases/", views.purchase_list, name="purchase_list"),
     path("purchases/add/", views.purchase_add, name="purchase_add"),
+    path("parts-analysis/", views.parts_analysis, name="parts_analysis"),
     path("product/<int:pk>/", views.product_detail, name="product_detail"),
-    path("warehouses/", views.warehouse_list, name="warehouse_list"),
+    path("verify-fitment/", views.verify_fitment_api, name="verify_fitment_api"),
+
 
     # --- CRUD Views for Inventory ---
     # Products

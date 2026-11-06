@@ -1,0 +1,295 @@
+{% extends "base.html" %}
+
+{% block title %}Income Statement (P&L) - {{ app_name }}{% endblock %}
+
+{% block page_title %}Income Statement (Profit & Loss){% endblock %}
+
+{% block extra_css %}
+<style>
+.statement-card {
+    background: hsl(var(--card));
+    border: 1px solid hsl(var(--border));
+    border-radius: var(--radius-lg, 12px);
+    overflow: hidden;
+    margin-bottom: 2rem;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.04);
+}
+.statement-header {
+    padding: 2rem;
+    border-bottom: 1px solid hsl(var(--border));
+    background: hsla(var(--bg-hover) / 0.4);
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    flex-wrap: wrap;
+    gap: 1.5rem;
+}
+.statement-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+.statement-table th,
+.statement-table td {
+    padding: 0.85rem 1.5rem;
+    font-size: 0.92rem;
+}
+.statement-table th {
+    background: hsla(var(--bg-hover) / 0.6);
+    font-weight: 700;
+    text-align: left;
+    color: hsl(var(--text-muted));
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    border-bottom: 1px solid hsl(var(--border));
+}
+.statement-table tr:hover td {
+    background: hsla(var(--bg-hover) / 0.2);
+}
+.row-section-header td {
+    background: hsla(var(--accent) / 0.06) !important;
+    font-weight: 800;
+    font-size: 0.95rem;
+    color: hsl(var(--accent));
+    padding-top: 1.25rem;
+    padding-bottom: 0.75rem;
+    border-top: 1px solid hsl(var(--border));
+}
+.row-indent-1 td:first-child {
+    padding-left: 2.5rem;
+}
+.row-subtotal td {
+    font-weight: 700;
+    border-top: 1px solid hsl(var(--border));
+    border-bottom: 1px solid hsl(var(--border));
+    background: hsla(var(--bg-hover) / 0.3);
+}
+.row-grand-total td {
+    font-weight: 800;
+    font-size: 1.15rem;
+    background: hsla(var(--accent) / 0.12) !important;
+    border-top: 2px solid hsl(var(--accent));
+    border-bottom: 3px double hsl(var(--accent));
+    color: hsl(var(--foreground));
+}
+.amount-cell {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    font-family: ui-monospace, monospace;
+}
+@media print {
+    #sidebar, .inventory-toolbar, .header-actions, .filter-bar-container, .no-print, .theme-toggle-btn {
+        display: none !important;
+    }
+    body, .layout, .main-content {
+        background: #fff !important;
+        color: #000 !important;
+        padding: 0 !important;
+        margin: 0 !important;
+    }
+    .statement-card {
+        border: none !important;
+        box-shadow: none !important;
+    }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="header-actions no-print" style="margin-bottom: 1.25rem; display: flex; justify-content: space-between; align-items: center;">
+    <div>
+        <a href="{% url 'reports_dashboard' %}" class="btn btn-secondary btn-sm">← Back to Reports Hub</a>
+    </div>
+    <div style="display: flex; gap: 0.5rem;">
+        <button onclick="window.print()" class="btn btn-secondary btn-sm" title="Print statement">🖨️ Print</button>
+        <a href="{% url 'income_statement_excel' %}?{% if request.GET %}{{ request.GET.urlencode }}{% endif %}" class="btn btn-secondary btn-sm" title="Download Excel Sheet">📊 Export Excel</a>
+        <a href="{% url 'income_statement_pdf' %}?{% if request.GET %}{{ request.GET.urlencode }}{% endif %}" class="btn btn-sm" target="_blank" title="Download official PDF">📄 Export PDF</a>
+    </div>
+</div>
+
+<div class="filter-bar-container no-print">
+    {% include "reports/_filter_bar.html" %}
+</div>
+
+<!-- WARNINGS / AUDIT NOTES BANNER -->
+{% if data.warnings %}
+<div class="card no-print" style="margin-bottom: 1.5rem; border-left: 4px solid #f59e0b; background: hsla(45 93% 47% / 0.05);">
+    <h3 style="margin: 0 0 0.5rem 0; font-size: 0.95rem; color: #d97706; display: flex; align-items: center; gap: 0.5rem;">
+        ⚠️ Accounting Notes & Data Disclosures
+    </h3>
+    <ul style="margin: 0; padding-left: 1.25rem; font-size: 0.85rem; color: hsl(var(--foreground)); line-height: 1.5;">
+        {% for w in data.warnings %}
+        <li><strong>{{ w.title }}:</strong> {{ w.message }}</li>
+        {% endfor %}
+    </ul>
+</div>
+{% endif %}
+
+<!-- FORMAL STATEMENT CARD -->
+<div class="statement-card">
+    <!-- Statement Header -->
+    <div class="statement-header">
+        <div>
+            <h1 style="margin: 0 0 0.25rem 0; font-size: 1.5rem; font-weight: 800;">{{ data.profile.name }}</h1>
+            {% if data.profile.trade_name %}
+            <div style="font-size: 0.95rem; color: hsl(var(--text-muted));">{{ data.profile.trade_name }}</div>
+            {% endif %}
+            <div style="font-size: 0.85rem; color: hsl(var(--text-muted)); margin-top: 0.35rem;">
+                {{ data.profile.address|default:"Addis Ababa, Ethiopia" }}
+                {% if data.profile.phone %} · Tel: {{ data.profile.phone }}{% endif %}
+            </div>
+            {% if data.profile.tin_number %}
+            <div style="font-size: 0.85rem; color: hsl(var(--text-muted)); margin-top: 0.2rem;">
+                TIN: <strong>{{ data.profile.tin_number }}</strong>
+                · VAT Status: <strong>{% if data.profile.vat_registered %}Registered (15%){% else %}Non-VAT{% endif %}</strong>
+            </div>
+            {% endif %}
+        </div>
+
+        <div style="text-align: right;">
+            <div style="font-size: 1.25rem; font-weight: 800; color: hsl(var(--accent));">STATEMENT OF PROFIT AND LOSS</div>
+            <div style="font-size: 0.95rem; font-weight: 600; color: hsl(var(--foreground)); margin-top: 0.25rem;">
+                For the period: {{ start_date|date:"F d, Y" }} to {{ end_date|date:"F d, Y" }}
+            </div>
+            <div style="font-size: 0.8rem; color: hsl(var(--text-muted)); margin-top: 0.35rem;">
+                Reporting Currency: <strong>{{ data.profile.currency_code }} (Ethiopian Birr)</strong>
+            </div>
+        </div>
+    </div>
+
+    <!-- Statement Table -->
+    <div class="table-container">
+        <table class="statement-table">
+            <thead>
+                <tr>
+                    <th style="width: 70%;">Account / Financial Element</th>
+                    <th class="amount-cell" style="width: 30%;">Amount ({{ data.profile.currency_code }})</th>
+                </tr>
+            </thead>
+            <tbody>
+                <!-- 1. REVENUE -->
+                <tr class="row-section-header">
+                    <td colspan="2">1. REVENUE / OPERATING SALES</td>
+                </tr>
+                <tr class="row-indent-1">
+                    <td>Gross Sales Revenue (Approved Invoices)</td>
+                    <td class="amount-cell">{{ data.gross_sales|floatformat:2 }}</td>
+                </tr>
+                {% if data.sales_returns > 0 %}
+                <tr class="row-indent-1">
+                    <td>Less: Sales Returns & Cancellations</td>
+                    <td class="amount-cell" style="color: #ef4444;">-{{ data.sales_returns|floatformat:2 }}</td>
+                </tr>
+                {% endif %}
+                <tr class="row-subtotal">
+                    <td>Net Sales Revenue</td>
+                    <td class="amount-cell">{{ data.net_sales|floatformat:2 }}</td>
+                </tr>
+                {% if data.profile.vat_registered %}
+                <tr class="row-indent-1" style="color: hsl(var(--text-muted));">
+                    <td>Less: VAT Collected (15% on behalf of government)</td>
+                    <td class="amount-cell" style="color: #ef4444;">-{{ data.vat_collected|floatformat:2 }}</td>
+                </tr>
+                <tr class="row-subtotal" style="background: hsla(var(--accent) / 0.04);">
+                    <td>Net Sales (Excluding Tax)</td>
+                    <td class="amount-cell" style="color: hsl(var(--accent)); font-weight: 700;">{{ data.net_sales_ex_vat|floatformat:2 }}</td>
+                </tr>
+                {% endif %}
+
+                <!-- 2. COST OF GOODS SOLD -->
+                <tr class="row-section-header">
+                    <td colspan="2">2. COST OF GOODS SOLD (COGS)</td>
+                </tr>
+                {% if data.has_opening_inventory %}
+                <tr class="row-indent-1">
+                    <td>Opening Inventory Valuation</td>
+                    <td class="amount-cell">{{ data.opening_inventory_value|floatformat:2 }}</td>
+                </tr>
+                <tr class="row-indent-1">
+                    <td>Add: Net Purchases (Direct Inventory Procurement)</td>
+                    <td class="amount-cell">{{ data.total_purchases|floatformat:2 }}</td>
+                </tr>
+                <tr class="row-indent-1" style="font-weight: 600; color: hsl(var(--text-muted));">
+                    <td>= Goods Available for Sale</td>
+                    <td class="amount-cell">{{ data.goods_available_for_sale|floatformat:2 }}</td>
+                </tr>
+                <tr class="row-indent-1">
+                    <td>Less: Closing Inventory Valuation</td>
+                    <td class="amount-cell" style="color: #10b981;">-{{ data.closing_inventory_value|floatformat:2 }}</td>
+                </tr>
+                {% else %}
+                <tr class="row-indent-1">
+                    <td>
+                        Transactional Cost of Goods Sold (Sum of recorded item cost prices)
+                        <div style="font-size: 0.78rem; color: hsl(var(--text-muted));">Perpetual inventory costing based on sales line items</div>
+                    </td>
+                    <td class="amount-cell">{{ data.cogs|floatformat:2 }}</td>
+                </tr>
+                {% endif %}
+                <tr class="row-subtotal">
+                    <td>Total Cost of Goods Sold (COGS)</td>
+                    <td class="amount-cell" style="color: #f59e0b;">{{ data.cogs|floatformat:2 }}</td>
+                </tr>
+
+                <!-- GROSS PROFIT -->
+                <tr class="row-grand-total">
+                    <td>
+                        GROSS PROFIT
+                        <span style="font-size: 0.82rem; font-weight: 600; color: #10b981; margin-left: 0.75rem;">
+                            ({{ data.gross_margin_percent|floatformat:1 }}% Gross Margin)
+                        </span>
+                    </td>
+                    <td class="amount-cell" style="color: #10b981;">{{ data.gross_profit|floatformat:2 }}</td>
+                </tr>
+
+                <!-- 3. OPERATING EXPENSES -->
+                <tr class="row-section-header">
+                    <td colspan="2">3. OPERATING EXPENSES (OVERHEAD)</td>
+                </tr>
+                {% for exp in data.expense_categories %}
+                <tr class="row-indent-1">
+                    <td>
+                        {{ exp.label }}
+                        <span style="font-size: 0.75rem; color: hsl(var(--text-muted)); margin-left: 0.5rem;">({{ exp.percentage|floatformat:1 }}% of expenses)</span>
+                    </td>
+                    <td class="amount-cell">{{ exp.amount|floatformat:2 }}</td>
+                </tr>
+                {% empty %}
+                <tr class="row-indent-1">
+                    <td class="text-muted">No operating expenses recorded for this period.</td>
+                    <td class="amount-cell">0.00</td>
+                </tr>
+                {% endfor %}
+                <tr class="row-subtotal">
+                    <td>Total Operating Expenses</td>
+                    <td class="amount-cell" style="color: #ef4444;">{{ data.total_expenses|floatformat:2 }}</td>
+                </tr>
+
+                <!-- NET PROFIT OR LOSS -->
+                <tr class="row-grand-total" style="background: hsla({% if data.net_profit >= 0 %}142 76% 36%{% else %}0 84% 60%{% endif %} / 0.15) !important;">
+                    <td>
+                        NET OPERATING PROFIT / (LOSS)
+                        <span style="font-size: 0.85rem; font-weight: 600; color: {% if data.net_profit >= 0 %}#10b981{% else %}#ef4444{% endif %}; margin-left: 0.75rem;">
+                            ({{ data.net_margin_percent|floatformat:1 }}% Net Margin)
+                        </span>
+                    </td>
+                    <td class="amount-cell" style="font-size: 1.3rem; color: {% if data.net_profit >= 0 %}#10b981{% else %}#ef4444{% endif %};">
+                        {{ data.net_profit|floatformat:2 }}
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Statement Footer Disclosures -->
+    <div style="padding: 1.5rem 2rem; border-top: 1px solid hsl(var(--border)); background: hsla(var(--bg-hover) / 0.2); display: flex; justify-content: space-between; align-items: center; font-size: 0.8rem; color: hsl(var(--text-muted));">
+        <div>
+            <span>Prepared on: <strong>{{ "now"|date:"F d, Y H:i" }}</strong></span>
+            <span style="margin-left: 1rem;">System: <strong>SpareParts ERP v2.0</strong></span>
+        </div>
+        <div>
+            <span>Status: <strong>Draft Internal Financial Statement</strong></span>
+        </div>
+    </div>
+</div>
+{% endblock %}

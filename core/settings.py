@@ -12,36 +12,109 @@ https://docs.djangoproject.com/en/6.0/ref/settings/
 
 from pathlib import Path
 import os
+import sys
+from urllib.parse import unquote, urlparse
+from django.core.exceptions import ImproperlyConfigured
+
+
+def get_bool(env_name, default=False):
+    """Read a boolean environment value with a forgiving parser."""
+    value = os.getenv(env_name)
+    if value is None:
+        return default
+    return value.strip().lower() in {'1', 'true', 'yes', 'on'}
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
-BASE_DIR = Path(__file__).resolve().parent.parent
+if getattr(sys, 'frozen', False):
+    BASE_DIR = Path(sys._MEIPASS)
+    EXE_DIR = Path(sys.executable).parent
+else:
+    BASE_DIR = Path(__file__).resolve().parent.parent
+    EXE_DIR = BASE_DIR
+
+# Load .env if present in EXE_DIR or BASE_DIR
+env_file = EXE_DIR / '.env'
+if not env_file.exists():
+    env_file = BASE_DIR / '.env'
+
+if env_file.exists():
+    try:
+        with open(env_file, 'r', encoding='utf-8') as f:
+            for line in f:
+                line = line.strip()
+                if line and not line.startswith('#') and '=' in line:
+                    k, v = line.split('=', 1)
+                    os.environ.setdefault(k.strip(), v.strip().strip('"').strip("'"))
+    except Exception:
+        pass
 
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/6.0/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-ae+bguqfsr%u6(sdc4p9x+(9yb21-15d!^8bi*ja^^&(32!s00'
+SECRET_KEY = os.getenv('DJANGO_SECRET_KEY') or os.getenv('SECRET_KEY') or 'django-insecure-ae+bguqfsr%u6(sdc4p9x+(9yb21-15d!^8bi*ja^^&(32!s00'
+APP_NAME = os.getenv('APP_NAME', 'Fetan Spare Parts').strip() or 'Fetan Spare Parts'
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = get_bool('DEBUG', True)
+if not DEBUG and SECRET_KEY.startswith('django-insecure-'):
+    raise ImproperlyConfigured('Set a production DJANGO_SECRET_KEY or SECRET_KEY in the environment.')
 
-ALLOWED_HOSTS = []
+# Default to SQLite for local development so fresh clones can run tests without
+# an external PostgreSQL instance. Production deployments can still opt in to
+# PostgreSQL by setting USE_SQLITE=False and providing DATABASE_URL or the
+# POSTGRES_* configuration.
+use_sqlite = get_bool('USE_SQLITE', DEBUG)
 
+ALLOWED_HOSTS = [
+    host.strip()
+    for host in os.getenv('ALLOWED_HOSTS', '*' if DEBUG else 'localhost,127.0.0.1').split(',')
+    if host.strip()
+]
 
-# Application definition
+CSRF_TRUSTED_ORIGINS = [
+    origin.strip() for origin in os.getenv(
+        'CSRF_TRUSTED_ORIGINS',
+        'http://127.0.0.1,http://localhost,http://0.0.0.0'
+    ).split(',') if origin.strip()
+]
+lan_ip = os.getenv('LAN_IP')
+if lan_ip:
+    CSRF_TRUSTED_ORIGINS.append(f'http://{lan_ip}')
 
-SHARED_APPS = (
-    'django_tenants',
-    'customers',
-    'django.contrib.admin',
-    'django.contrib.auth',
-    'django.contrib.contenttypes',
-    'django.contrib.sessions',
-    'django.contrib.messages',
-    'django.contrib.staticfiles',
-    'b2b',
-)
+if not DEBUG:
+    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+    SESSION_COOKIE_SECURE = os.getenv('SESSION_COOKIE_SECURE', 'True') == 'True'
+    CSRF_COOKIE_SECURE = os.getenv('CSRF_COOKIE_SECURE', 'True') == 'True'
+    render_hostname = os.getenv('RENDER_EXTERNAL_HOSTNAME')
+    if render_hostname:
+        ALLOWED_HOSTS.append(render_hostname)
+        CSRF_TRUSTED_ORIGINS.append(f'https://{render_hostname}')
+
+if use_sqlite:
+    SHARED_APPS = (
+        'django.contrib.admin',
+        'django.contrib.auth',
+        'django.contrib.contenttypes',
+        'django.contrib.sessions',
+        'django.contrib.messages',
+        'django.contrib.staticfiles',
+        'customers',
+        'b2b',
+    )
+else:
+    SHARED_APPS = (
+        'django_tenants',
+        'django.contrib.admin',
+        'django.contrib.auth',
+        'django.contrib.contenttypes',
+        'django.contrib.sessions',
+        'django.contrib.messages',
+        'django.contrib.staticfiles',
+        'customers',
+        'b2b',
+    )
 
 TENANT_APPS = (
     'django.contrib.admin',
@@ -50,29 +123,34 @@ TENANT_APPS = (
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-
-    "inventory.apps.InventoryConfig", 
+    'inventory.apps.InventoryConfig',
     'sales.apps.SalesConfig',
     'expenses',
     'hr',
     'store',
-    'b2b',
+    'reports.apps.ReportsConfig',
 )
 
-INSTALLED_APPS = list(SHARED_APPS) + [app for app in TENANT_APPS if app not in SHARED_APPS]
+INSTALLED_APPS = list(SHARED_APPS) + [
+    app for app in TENANT_APPS if app not in SHARED_APPS
+]
 
 TENANT_MODEL = "customers.Client"
 TENANT_DOMAIN_MODEL = "customers.Domain"
 
 LOGIN_URL = "login"
+
 LOGIN_REDIRECT_URL = "/dashboard/"
 LOGOUT_REDIRECT_URL = "login"
 
 
-MIDDLEWARE = [
+MIDDLEWARE = ([] if use_sqlite else [
     'django_tenants.middleware.main.TenantMainMiddleware',
+]) + [
     'django.middleware.security.SecurityMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
+    'django.middleware.locale.LocaleMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
@@ -82,6 +160,7 @@ MIDDLEWARE = [
 
 ROOT_URLCONF = 'core.urls_tenant'
 PUBLIC_SCHEMA_URLCONF = 'core.urls_public'
+DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 TEMPLATES = [
     {
@@ -93,6 +172,8 @@ TEMPLATES = [
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
+                'django.template.context_processors.i18n',
+                'core.context_processors.app_context',
             ],
         },
     },
@@ -100,24 +181,64 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'core.wsgi.application'
 
+# Database configuration
+database_url = os.getenv('DATABASE_URL')
+postgres_db = os.getenv('POSTGRES_DB', 'erp_saas')
+postgres_user = os.getenv('POSTGRES_USER', 'postgres')
+postgres_password = os.getenv('POSTGRES_PASSWORD', '')
+postgres_host = os.getenv('POSTGRES_HOST', 'localhost')
+postgres_port = os.getenv('POSTGRES_PORT', '5432')
 
-# Database
-# https://docs.djangoproject.com/en/6.0/ref/settings/#databases
+if database_url and not use_sqlite:
+    parsed_database_url = urlparse(database_url)
+    if parsed_database_url.scheme not in ('postgres', 'postgresql'):
+        raise ValueError('DATABASE_URL must use the postgres or postgresql scheme.')
+    postgres_db = unquote(parsed_database_url.path.lstrip('/'))
+    postgres_user = unquote(parsed_database_url.username or '')
+    postgres_password = unquote(parsed_database_url.password or '')
+    postgres_host = parsed_database_url.hostname or ''
+    postgres_port = str(parsed_database_url.port or 5432)
 
-DATABASES = {
-    'default': {
-        'ENGINE': 'django_tenants.postgresql_backend',
-        'NAME': os.getenv('POSTGRES_DB', 'erp_saas'),
-        'USER': os.getenv('POSTGRES_USER', 'postgres'),
-        'PASSWORD': os.getenv('POSTGRES_PASSWORD', '3422'),
-        'HOST': os.getenv('POSTGRES_HOST', 'localhost'),
-        'PORT': os.getenv('POSTGRES_PORT', '5432'),
+if not use_sqlite:
+    try:
+        import psycopg2
+        conn = psycopg2.connect(
+            dbname=postgres_db,
+            user=postgres_user,
+            password=postgres_password,
+            host=postgres_host,
+            port=postgres_port,
+            connect_timeout=2
+        )
+        conn.close()
+    except Exception as e:
+        raise ImproperlyConfigured(
+            'PostgreSQL must be reachable when USE_SQLITE is disabled; '
+            'configure DATABASE_URL or the POSTGRES_* settings.'
+        ) from e
+
+if use_sqlite:
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': EXE_DIR / 'db.sqlite3',
+        }
     }
-}
+else:
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django_tenants.postgresql_backend',
+            'NAME': postgres_db,
+            'USER': postgres_user,
+            'PASSWORD': postgres_password,
+            'HOST': postgres_host,
+            'PORT': postgres_port,
+        }
+    }
 
-DATABASE_ROUTERS = (
+DATABASE_ROUTERS = (() if use_sqlite else (
     'django_tenants.routers.TenantSyncRouter',
-)
+))
 
 
 # Password validation
@@ -143,6 +264,10 @@ AUTH_PASSWORD_VALIDATORS = [
 # https://docs.djangoproject.com/en/6.0/topics/i18n/
 
 LANGUAGE_CODE = 'en-us'
+LANGUAGES = [
+    ('en', 'English'),
+    ('am', 'አማርኛ'),
+]
 
 TIME_ZONE = 'UTC'
 
@@ -159,6 +284,18 @@ STATIC_URL = '/static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 STATICFILES_DIRS = [os.path.join(BASE_DIR, 'static')]
 
+STORAGES = {
+    'default': {
+        'BACKEND': 'django.core.files.storage.FileSystemStorage',
+    },
+    'staticfiles': {
+        'BACKEND': 'whitenoise.storage.CompressedStaticFilesStorage',
+    },
+}
+
+MEDIA_URL = '/media/'
+MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+
 
 # Email settings
 EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'  # For development - prints to console
@@ -171,4 +308,3 @@ EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'  # For developm
 # EMAIL_HOST_PASSWORD = 'your-app-password'
 
 DEFAULT_FROM_EMAIL = 'noreply@erp-my-shop.com'
-

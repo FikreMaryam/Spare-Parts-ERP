@@ -1,50 +1,316 @@
 {% extends "base.html" %}
 
-{% block title %}Add Purchase - ERP My Shop{% endblock %}
+{% block title %}Add Purchase - {{ app_name }}{% endblock %}
+
+{% block page_title %}New Purchase Order / Receive Stock{% endblock %}
 
 {% block content %}
-<h1>Add Purchase (Bought Items)</h1>
-
-<div class="card">
-    <form method="post">
+<div style="max-width: 1200px; margin: 0 auto;">
+    <form method="post" id="purchaseForm" enctype="multipart/form-data">
         {% csrf_token %}
-        <p><label>Invoice #: <input type="text" name="invoice_number" placeholder="Supplier invoice"></label></p>
-        <p>
-            <label>Supplier: <select name="supplier">
-                <option value="">— None —</option>
-                {% for s in suppliers %}
-                <option value="{{ s.id }}">{{ s.name }}</option>
-                {% endfor %}
-            </select></label>
-        </p>
-        <p><label>Notes: <input type="text" name="notes" placeholder="Optional"></label></p>
+        
+        <!-- Header Info Card -->
+        <div class="card" style="padding: 1.75rem; margin-bottom: 2rem; border-radius: var(--radius-lg, 12px);">
+            <h2 style="font-size: 1.1rem; font-weight: 700; margin-bottom: 1.25rem; color: hsl(var(--text)); display: flex; align-items: center; gap: 0.5rem;">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 20px; height: 20px; color: hsl(var(--accent));"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
+                Purchase Order Header
+            </h2>
+            
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1.25rem;">
+                <div>
+                    <label style="display: block; font-size: 0.85rem; font-weight: 600; margin-bottom: 0.4rem; color: hsl(var(--text-muted));">Invoice / Ref #</label>
+                    <input type="text" name="invoice_number" placeholder="e.g. INV-90482" class="form-input" style="width: 100%; padding: 0.65rem 0.85rem; border-radius: 8px; border: 1px solid hsl(var(--border)); background: hsl(var(--bg)); color: hsl(var(--text)); font-size: 0.95rem;">
+                </div>
 
-        <table style="margin-top: 1rem;">
-            <thead>
-                <tr>
-                    <th>Product</th>
-                    <th>Part #</th>
-                    <th>Qty to add</th>
-                    <th>Unit cost</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for p in products %}
-                <tr>
-                    <td>{{ p.name }}</td>
-                    <td>{{ p.part_number|default:"—" }}</td>
-                    <td><input type="number" name="qty_{{ p.id }}" min="0" value="0" style="width: 70px;"></td>
-                    <td><input type="number" name="cost_{{ p.id }}" step="0.01" min="0" value="{{ p.cost_price|floatformat:2 }}" style="width: 90px;"></td>
-                </tr>
-                {% empty %}
-                <tr><td colspan="4">No products. <a href="{% url 'import_inventory' %}">Import inventory</a> first.</td></tr>
-                {% endfor %}
-            </tbody>
-        </table>
-        <p style="margin-top: 1rem;">
-            <button type="submit" class="btn">Save Purchase</button>
-            <a href="{% url 'purchase_list' %}" class="btn btn-secondary">Cancel</a>
-        </p>
+                <div>
+                    <label style="display: block; font-size: 0.85rem; font-weight: 600; margin-bottom: 0.4rem; color: hsl(var(--text-muted));">Date on supplier receipt</label>
+                    <input type="date" name="document_date" value="{{ today }}" class="form-input" style="width: 100%; padding: 0.65rem 0.85rem; border-radius: 8px; border: 1px solid hsl(var(--border)); background: hsl(var(--bg)); color: hsl(var(--text)); font-size: 0.95rem;">
+                </div>
+
+                <div>
+                    <label style="display: block; font-size: 0.85rem; font-weight: 600; margin-bottom: 0.4rem; color: hsl(var(--text-muted));">Supplier</label>
+                    <select name="supplier" class="form-input" style="width: 100%; padding: 0.65rem 0.85rem; border-radius: 8px; border: 1px solid hsl(var(--border)); background: hsl(var(--bg)); color: hsl(var(--text)); font-size: 0.95rem;">
+                        <option value="">— Select Supplier (Optional) —</option>
+                        {% for s in suppliers %}
+                        <option value="{{ s.id }}">{{ s.name }} {% if s.contact %}({{ s.contact }}){% endif %}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div>
+                    <label style="display: block; font-size: 0.85rem; font-weight: 600; margin-bottom: 0.4rem; color: hsl(var(--text-muted));">Receiving Warehouse</label>
+                    <select name="warehouse" class="form-input" style="width: 100%; padding: 0.65rem 0.85rem; border-radius: 8px; border: 1px solid hsl(var(--border)); background: hsl(var(--bg)); color: hsl(var(--text)); font-size: 0.95rem;">
+                        <option value="">— Main Warehouse —</option>
+                        {% for w in warehouses %}
+                        <option value="{{ w.id }}">{{ w.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div>
+                    <label style="display: block; font-size: 0.85rem; font-weight: 600; margin-bottom: 0.4rem; color: hsl(var(--text-muted));">Notes / Remarks</label>
+                    <input type="text" name="notes" placeholder="Optional notes e.g. Shipment details" class="form-input" style="width: 100%; padding: 0.65rem 0.85rem; border-radius: 8px; border: 1px solid hsl(var(--border)); background: hsl(var(--bg)); color: hsl(var(--text)); font-size: 0.95rem;">
+                </div>
+
+                <div>
+                    <label style="display: block; font-size: 0.85rem; font-weight: 600; margin-bottom: 0.4rem; color: hsl(var(--text-muted));">Purchase Receipt / Invoice Upload</label>
+                    <input type="file" name="purchase_receipt" accept=".pdf,.png,.jpg,.jpeg,.webp,.gif" class="form-input" style="width: 100%; padding: 0.65rem 0.85rem; border-radius: 8px; border: 1px solid hsl(var(--border)); background: hsl(var(--bg)); color: hsl(var(--text)); font-size: 0.95rem;">
+                    <small style="display: block; margin-top: 0.35rem; color: hsl(var(--text-muted));">Attach a supplier invoice, receiving note, or purchase receipt.</small>
+                </div>
+            </div>
+        </div>
+
+        <!-- Line Items Section -->
+        <div class="card" style="padding: 1.75rem; margin-bottom: 2rem; border-radius: var(--radius-lg, 12px);">
+            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; margin-bottom: 1.5rem;">
+                <div>
+                    <h2 style="font-size: 1.1rem; font-weight: 700; margin: 0; color: hsl(var(--text));">Purchase Line Items</h2>
+                    <p style="margin: 0.25rem 0 0 0; font-size: 0.85rem; color: hsl(var(--text-muted));">Add existing products or create new products inline directly to stock.</p>
+                </div>
+                
+                <div style="display: flex; gap: 0.75rem;">
+                    <button type="button" onclick="addExistingItemRow()" class="btn btn-secondary" style="display: flex; align-items: center; gap: 0.4rem; font-size: 0.88rem;">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 16px; height: 16px;"><path d="M12 5v14M5 12h14"/></svg>
+                        + Add Existing Product
+                    </button>
+                    <button type="button" onclick="addNewProductRow()" class="btn" style="display: flex; align-items: center; gap: 0.4rem; font-size: 0.88rem; background: hsl(var(--accent)); color: white;">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 16px; height: 16px;"><path d="M12 5v14M5 12h14"/></svg>
+                        + Add NEW Product
+                    </button>
+                </div>
+            </div>
+
+            <!-- Items Table container -->
+            <div style="overflow-x: auto; margin-bottom: 1.5rem;">
+                <table id="purchaseItemsTable" style="width: 100%; border-collapse: separate; border-spacing: 0 0.5rem;">
+                    <thead>
+                        <tr style="text-align: left; font-size: 0.8rem; text-transform: uppercase; color: hsl(var(--text-muted)); border-bottom: 2px solid hsl(var(--border));">
+                            <th style="padding: 0.75rem 0.5rem; width: 110px;">Type</th>
+                            <th style="padding: 0.75rem 0.5rem;">Product Details / Name</th>
+                            <th style="padding: 0.75rem 0.5rem; width: 110px;">Qty Recv</th>
+                            <th style="padding: 0.75rem 0.5rem; width: 120px;">Unit Cost</th>
+                            <th style="padding: 0.75rem 0.5rem; width: 130px; text-align: right;">Line Total</th>
+                            <th style="padding: 0.75rem 0.5rem; width: 60px; text-align: center;">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody id="purchaseItemsBody">
+                        <!-- Dynamic rows inserted here -->
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Summary Bar -->
+            <div style="background: hsla(var(--accent) / 0.05); border: 1px solid hsla(var(--accent) / 0.2); padding: 1.25rem; border-radius: 10px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+                <div style="font-size: 0.9rem; color: hsl(var(--text-muted)); font-weight: 500;">
+                    Total Items: <span id="itemCountDisplay" style="font-weight: 700; color: hsl(var(--text));">0</span>
+                </div>
+                <div style="display: flex; align-items: center; gap: 0.75rem;">
+                    <span style="font-size: 1rem; font-weight: 600; color: hsl(var(--text-muted));">Grand Total:</span>
+                    <span id="grandTotalDisplay" style="font-size: 1.75rem; font-weight: 800; color: hsl(var(--accent));">$0.00</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Form Actions -->
+        <div style="display: flex; gap: 1rem; justify-content: flex-end;">
+            <a href="{% url 'purchase_list' %}" class="btn btn-secondary" style="padding: 0.75rem 1.75rem;">Cancel</a>
+            <button type="submit" class="btn" style="padding: 0.75rem 2.25rem; font-weight: 700; font-size: 1rem;">Save Purchase Order</button>
+        </div>
     </form>
 </div>
+
+<!-- Hidden product data map for JS lookup -->
+<script id="productsData" type="application/json">
+[
+    {% for p in products %}
+    {
+        "id": {{ p.id }},
+        "name": "{{ p.name|escapejs }}",
+        "part_number": "{{ p.part_number|default:''|escapejs }}",
+        "sku": "{{ p.sku|default:''|escapejs }}",
+        "cost_price": {{ p.cost_price|default:0.0 }}
+    }{% if not forloop.last %},{% endif %}
+    {% endfor %}
+]
+</script>
+
+<script>
+    const productsList = JSON.parse(document.getElementById('productsData').textContent || '[]');
+    const categoriesOptions = `
+        <option value="">— Category —</option>
+        {% for c in categories %}
+        <option value="{{ c.id }}">{{ c.name|escapejs }}</option>
+        {% endfor %}
+    `;
+
+    function addExistingItemRow() {
+        const tbody = document.getElementById('purchaseItemsBody');
+        const tr = document.createElement('tr');
+        tr.className = 'item-row';
+        tr.style.background = 'hsl(var(--card))';
+        tr.style.border = '1px solid hsl(var(--border))';
+
+        let prodOptions = '<option value="">-- Select Existing Product --</option>';
+        productsList.forEach(p => {
+            const partStr = p.part_number ? ` [${p.part_number}]` : '';
+            prodOptions += `<option value="${p.id}" data-cost="${p.cost_price}">${p.name}${partStr} ($${p.cost_price.toFixed(2)})</option>`;
+        });
+
+        tr.innerHTML = `
+            <td style="padding: 0.75rem 0.5rem; vertical-align: top;">
+                <input type="hidden" name="item_type[]" value="existing">
+                <span style="display: inline-block; padding: 0.25rem 0.6rem; background: hsla(210, 100%, 50%, 0.1); color: hsl(210, 100%, 45%); font-size: 0.75rem; font-weight: 700; border-radius: 6px;">Existing</span>
+            </td>
+            <td style="padding: 0.75rem 0.5rem; vertical-align: top;">
+                <select name="existing_product_id[]" onchange="onExistingProductChange(this)" class="form-input" style="width: 100%; padding: 0.55rem; border-radius: 6px; border: 1px solid hsl(var(--border)); background: hsl(var(--bg)); color: hsl(var(--text));" required>
+                    ${prodOptions}
+                </select>
+            </td>
+            <td style="padding: 0.75rem 0.5rem; vertical-align: top;">
+                <input type="number" name="existing_qty[]" value="1" min="1" oninput="calculateTotals()" class="form-input" style="width: 100%; padding: 0.55rem; border-radius: 6px; border: 1px solid hsl(var(--border)); background: hsl(var(--bg)); color: hsl(var(--text)); text-align: center;" required>
+            </td>
+            <td style="padding: 0.75rem 0.5rem; vertical-align: top;">
+                <input type="number" name="existing_cost[]" value="0.00" step="0.01" min="0" oninput="calculateTotals()" class="form-input cost-input" style="width: 100%; padding: 0.55rem; border-radius: 6px; border: 1px solid hsl(var(--border)); background: hsl(var(--bg)); color: hsl(var(--text));" required>
+            </td>
+            <td style="padding: 0.75rem 0.5rem; vertical-align: top; text-align: right; font-weight: 700; font-family: monospace; font-size: 1rem; color: hsl(var(--text));" class="line-total">
+                $0.00
+            </td>
+            <td style="padding: 0.75rem 0.5rem; vertical-align: top; text-align: center;">
+                <button type="button" onclick="removeRow(this)" style="background: none; border: none; color: hsl(var(--error)); cursor: pointer; padding: 0.4rem; border-radius: 6px;" title="Remove row">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 18px; height: 18px;"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                </button>
+            </td>
+        `;
+        tbody.appendChild(tr);
+        calculateTotals();
+    }
+
+    function addNewProductRow() {
+        const tbody = document.getElementById('purchaseItemsBody');
+        const tr = document.createElement('tr');
+        tr.className = 'item-row';
+        tr.style.background = 'hsla(var(--accent) / 0.03)';
+        tr.style.border = '1px solid hsla(var(--accent) / 0.2)';
+
+        tr.innerHTML = `
+            <td style="padding: 0.75rem 0.5rem; vertical-align: top;">
+                <input type="hidden" name="item_type[]" value="new">
+                <span style="display: inline-block; padding: 0.25rem 0.6rem; background: hsla(140, 100%, 35%, 0.15); color: hsl(140, 100%, 35%); font-size: 0.75rem; font-weight: 700; border-radius: 6px;">NEW</span>
+            </td>
+            <td style="padding: 0.75rem 0.5rem; vertical-align: top;">
+                <div style="display: grid; gap: 0.5rem;">
+                    <input type="text" name="new_name[]" placeholder="Product Name (Required)*" class="form-input" style="width: 100%; padding: 0.55rem; border-radius: 6px; border: 1px solid hsl(var(--border)); background: hsl(var(--bg)); color: hsl(var(--text)); font-weight: 600;" required>
+                    
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem;">
+                        <input type="text" name="new_sku[]" placeholder="Product ID / SKU" class="form-input" style="padding: 0.45rem; border-radius: 6px; border: 1px solid hsl(var(--border)); background: hsl(var(--bg)); color: hsl(var(--text)); font-size: 0.85rem;">
+                        <input type="text" name="new_part_number[]" placeholder="Part # / OEM" class="form-input" style="padding: 0.45rem; border-radius: 6px; border: 1px solid hsl(var(--border)); background: hsl(var(--bg)); color: hsl(var(--text)); font-size: 0.85rem;">
+                    </div>
+                    
+                    <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0.5rem;">
+                        <select name="new_category_id[]" class="form-input" style="padding: 0.45rem; border-radius: 6px; border: 1px solid hsl(var(--border)); background: hsl(var(--bg)); color: hsl(var(--text)); font-size: 0.85rem;">
+                            ${categoriesOptions}
+                        </select>
+                        <input type="text" name="new_brand[]" placeholder="Brand/Manufacturer" class="form-input" style="padding: 0.45rem; border-radius: 6px; border: 1px solid hsl(var(--border)); background: hsl(var(--bg)); color: hsl(var(--text)); font-size: 0.85rem;">
+                        <input type="text" name="new_location[]" placeholder="Shelf/Bin (Location)" class="form-input" style="padding: 0.45rem; border-radius: 6px; border: 1px solid hsl(var(--border)); background: hsl(var(--bg)); color: hsl(var(--text)); font-size: 0.85rem;">
+                    </div>
+                </div>
+            </td>
+            <td style="padding: 0.75rem 0.5rem; vertical-align: top;">
+                <input type="number" name="new_qty[]" value="1" min="1" oninput="calculateTotals()" class="form-input" style="width: 100%; padding: 0.55rem; border-radius: 6px; border: 1px solid hsl(var(--border)); background: hsl(var(--bg)); color: hsl(var(--text)); text-align: center;" required>
+            </td>
+            <td style="padding: 0.75rem 0.5rem; vertical-align: top;">
+                <div style="display: grid; gap: 0.5rem;">
+                    <div>
+                        <label style="display: block; font-size: 0.75rem; color: hsl(var(--text-muted));">Unit Cost</label>
+                        <input type="number" name="new_cost[]" value="0.00" step="0.01" min="0" oninput="calculateTotals()" class="form-input cost-input" style="width: 100%; padding: 0.45rem; border-radius: 6px; border: 1px solid hsl(var(--border)); background: hsl(var(--bg)); color: hsl(var(--text)); font-size: 0.9rem;" required>
+                    </div>
+                    <div>
+                        <label style="display: block; font-size: 0.75rem; color: hsl(var(--text-muted));">Selling Price</label>
+                        <input type="number" name="new_selling_price[]" value="0.00" step="0.01" min="0" class="form-input" style="width: 100%; padding: 0.45rem; border-radius: 6px; border: 1px solid hsl(var(--border)); background: hsl(var(--bg)); color: hsl(var(--text)); font-size: 0.9rem;">
+                    </div>
+                </div>
+            </td>
+            <td style="padding: 0.75rem 0.5rem; vertical-align: top; text-align: right; font-weight: 700; font-family: monospace; font-size: 1rem; color: hsl(var(--text));" class="line-total">
+                $0.00
+            </td>
+            <td style="padding: 0.75rem 0.5rem; vertical-align: top; text-align: center;">
+                <button type="button" onclick="removeRow(this)" style="background: none; border: none; color: hsl(var(--error)); cursor: pointer; padding: 0.4rem; border-radius: 6px;" title="Remove row">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 18px; height: 18px;"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                </button>
+            </td>
+        `;
+        tbody.appendChild(tr);
+        calculateTotals();
+    }
+
+    function onExistingProductChange(selectElem) {
+        const selectedOpt = selectElem.options[selectElem.selectedIndex];
+        const cost = parseFloat(selectedOpt.getAttribute('data-cost') || 0);
+        const row = selectElem.closest('tr');
+        const costInput = row.querySelector('.cost-input');
+        if (costInput && cost > 0) {
+            costInput.value = cost.toFixed(2);
+        }
+        calculateTotals();
+    }
+
+    function removeRow(btn) {
+        const row = btn.closest('tr');
+        row.remove();
+        calculateTotals();
+    }
+
+    function calculateTotals() {
+        const rows = document.querySelectorAll('.item-row');
+        let grandTotal = 0;
+        let count = 0;
+
+        rows.forEach(row => {
+            const itemTypeInput = row.querySelector('input[name="item_type[]"]');
+            if (!itemTypeInput) return;
+
+            let qty = 0;
+            let cost = 0;
+
+            if (itemTypeInput.value === 'existing') {
+                const qtyInput = row.querySelector('input[name="existing_qty[]"]');
+                const costInput = row.querySelector('input[name="existing_cost[]"]');
+                const prodSelect = row.querySelector('select[name="existing_product_id[]"]');
+                
+                if (prodSelect && prodSelect.value) {
+                    qty = parseInt(qtyInput ? qtyInput.value : 0) || 0;
+                    cost = parseFloat(costInput ? costInput.value : 0) || 0;
+                }
+            } else if (itemTypeInput.value === 'new') {
+                const nameInput = row.querySelector('input[name="new_name[]"]');
+                const qtyInput = row.querySelector('input[name="new_qty[]"]');
+                const costInput = row.querySelector('input[name="new_cost[]"]');
+
+                if (nameInput && nameInput.value.trim() !== '') {
+                    qty = parseInt(qtyInput ? qtyInput.value : 0) || 0;
+                    cost = parseFloat(costInput ? costInput.value : 0) || 0;
+                }
+            }
+
+            const lineTotal = qty * cost;
+            const lineTotalCell = row.querySelector('.line-total');
+            if (lineTotalCell) {
+                lineTotalCell.textContent = `$${lineTotal.toFixed(2)}`;
+            }
+
+            if (qty > 0) {
+                grandTotal += lineTotal;
+                count += 1;
+            }
+        });
+
+        document.getElementById('grandTotalDisplay').textContent = `$${grandTotal.toFixed(2)}`;
+        document.getElementById('itemCountDisplay').textContent = count;
+    }
+
+    // Initialize with 1 default existing row on load
+    document.addEventListener('DOMContentLoaded', () => {
+        addExistingItemRow();
+    });
+</script>
 {% endblock %}

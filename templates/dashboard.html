@@ -1,71 +1,246 @@
 {% extends "base.html" %}
 
-{% block title %}Dashboard - Spare ERP{% endblock %}
+{% block title %}{{ app_name }} - {{ ui.dashboard|default:"Dashboard" }}{% endblock %}
 
-{% block page_title %}Dashboard{% endblock %}
+{% block page_title %}{{ ui.dashboard|default:"Dashboard" }}{% endblock %}
 
 {% block content %}
 
-<div class="dashboard-grid">
-    <div class="card stat-card">
-        <div class="stat-label">Total Products</div>
-        <div class="stat-value">{{ stats.total_products }}</div>
+<div class="dashboard-page">
+<div class="status-bar dashboard-topbar">
+    <div class="status-bar-meta">
+        <div>
+            <div class="dashboard-kicker">{{ ui.dashboard_overview|default:"Business overview" }}</div>
+            <p class="status-bar-title">{{ app_name }}</p>
+            <div class="status-bar-sub">TIN 0081095335 · VAT 42178020821 · Teklehaymanot, Addis Ababa</div>
+        </div>
     </div>
-    <div class="card stat-card">
-        <div class="stat-label">Low Stock</div>
-        <div class="stat-value text-error">{{ stats.low_stock_count }}</div>
-    </div>
-    <div class="card stat-card">
-        <div class="stat-label">Total Sales</div>
-        <div class="stat-value">{{ stats.total_sales }}</div>
-    </div>
-    <div class="card stat-card">
-        <div class="stat-label">Revenue</div>
-        <div class="stat-value">${{ stats.total_revenue|floatformat:2 }}</div>
+
+    <form method="get" action="{% url 'pos' %}" class="status-bar-search">
+        <input type="text" name="q" placeholder="{{ ui.search_placeholder|default:'Search part #, OEM, or car model' }}" class="form-input">
+        <button type="submit" class="btn btn-sm">{{ ui.find|default:"Find" }}</button>
+    </form>
+
+    <div class="header-actions dashboard-header-actions" style="margin: 0;">
+        <a href="{% url 'backup_database' %}?format=excel" class="btn btn-secondary btn-sm">{{ ui.excel_backup|default:"Excel backup" }}</a>
+        <span class="badge badge-ok">{{ ui.active|default:"Active" }}</span>
     </div>
 </div>
 
-<div class="card">
-    <h2 class="mb-4">Quick Actions</h2>
-    <div class="actions-wrapper">
-        <a href="{% url 'pos' %}" class="btn">Point of Sale</a>
-        <a href="{% url 'product_list' %}" class="btn btn-secondary">Inventory</a>
-        <a href="{% url 'purchase_add' %}" class="btn btn-secondary">Add Purchase</a>
-        <a href="{% url 'sales_report' %}" class="btn btn-secondary">Sales Report</a>
-        <a href="{% url 'employee_list' %}" class="btn btn-secondary">Employees</a>
+<section class="dashboard-section" aria-labelledby="dashboard-kpis-title">
+    <div class="dashboard-section-heading">
+        <h2 id="dashboard-kpis-title">{{ ui.business_snapshot|default:"Business snapshot" }}</h2>
+        <span>{% now "D, d M Y" %}</span>
+    </div>
+    <div class="dashboard-grid dashboard-kpi-grid">
+    <div class="card stat-card dashboard-kpi dashboard-kpi-primary">
+        <div class="stat-label">{{ ui.todays_sales|default:"Today's sales" }}</div>
+        <div class="stat-value">{{ stats.today_sales_total|floatformat:2 }} <span class="text-muted" style="font-size:0.75rem;font-weight:600">ETB</span></div>
+        <div class="kpi-note">{{ stats.today_sales_count }} {{ ui.sales_today|default:"sale(s) today" }}</div>
+    </div>
+    <div class="card stat-card dashboard-kpi">
+        <div class="stat-label">{{ ui.inventory_value|default:"Inventory value" }}</div>
+        <div class="stat-value">{{ stats.total_inventory_value|floatformat:2 }} <span class="text-muted" style="font-size:0.75rem;font-weight:600">ETB</span></div>
+        <div class="kpi-note">{{ stats.total_products }} {{ ui.registered_parts|default:"registered parts" }}</div>
+    </div>
+    <a href="{% url 'product_list' %}?stock=low" class="card stat-card dashboard-kpi dashboard-kpi-link{% if stats.low_stock_count > 0 %} dashboard-kpi-warning{% endif %}" style="text-decoration:none">
+        <div class="stat-label">{{ ui.low_stock|default:"Low stock" }}</div>
+        <div class="stat-value {% if stats.low_stock_count > 0 %}text-error{% endif %}">{{ stats.low_stock_count }}</div>
+        <div class="kpi-note">{{ ui.below_reorder_threshold|default:"Below reorder threshold" }}</div>
+    </a>
+    <a href="{% url 'proforma_list' %}" class="card stat-card dashboard-kpi dashboard-kpi-link" style="text-decoration:none">
+        <div class="stat-label">{{ ui.proformas|default:"Proformas" }}</div>
+        <div class="stat-value">{{ stats.proformas_count }}</div>
+        <div class="kpi-note">{{ ui.quotations_issued|default:"Quotations issued" }}</div>
+    </a>
+    <div class="card stat-card dashboard-kpi">
+        <div class="stat-label">{{ ui.all_time_revenue|default:"All-time revenue" }}</div>
+        <div class="stat-value">{{ stats.total_revenue|floatformat:2 }} <span class="text-muted" style="font-size:0.75rem;font-weight:600">ETB</span></div>
+        <div class="kpi-note">{{ stats.total_sales }} {{ ui.invoices|default:"invoices" }}</div>
+    </div>
+    </div>
+</section>
+
+<section class="dashboard-section" aria-labelledby="dashboard-actions-title">
+    <div class="dashboard-section-heading">
+        <h2 id="dashboard-actions-title">{{ ui.quick_actions|default:"Quick actions" }}</h2>
+    </div>
+    <div class="launchpad">
+        <a href="{% url 'pos' %}" class="card launch-card">
+            <div><h3>{{ ui.point_of_sale|default:"Point of Sale" }}</h3><p>{{ ui.point_of_sale_description|default:"Counter sale and invoice" }}</p></div>
+            <span class="go">{{ ui.open_pos|default:"Open POS" }} <span aria-hidden="true">&#8594;</span></span>
+        </a>
+        <a href="{% url 'proforma_create' %}" class="card launch-card">
+            <div><h3>{{ ui.new_proforma|default:"New Proforma" }}</h3><p>{{ ui.price_quotation|default:"Price quotation" }}</p></div>
+            <span class="go">{{ ui.write_proforma|default:"Write proforma" }} <span aria-hidden="true">&#8594;</span></span>
+        </a>
+        <a href="{% url 'product_create' %}" class="card launch-card">
+            <div><h3>{{ ui.add_part|default:"Add Part" }}</h3><p>{{ ui.oem_fitment|default:"OEM number and fitment" }}</p></div>
+            <span class="go">{{ ui.register_part|default:"Register part" }} <span aria-hidden="true">&#8594;</span></span>
+        </a>
+        <a href="{% url 'warehouse_list' %}" class="card launch-card">
+            <div><h3>{{ ui.shops|default:"Stores" }}</h3><p>{{ stats.warehouses_count }} {{ ui.shop_transfers|default:"shops, transfers" }}</p></div>
+            <span class="go">{{ ui.view_stores|default:"View stores" }} <span aria-hidden="true">&#8594;</span></span>
+        </a>
+        <a href="{% url 'import_shipments_list' %}" class="card launch-card">
+            <div><h3>{{ ui.imports|default:"Imports" }}</h3><p>{{ ui.landed_cost_etb|default:"Landed cost in ETB" }}</p></div>
+            <span class="go">{{ ui.import_worksheet|default:"Import worksheet" }} <span aria-hidden="true">&#8594;</span></span>
+        </a>
+        <a href="{% url 'reports_dashboard' %}" class="card launch-card">
+            <div><h3>{{ ui.reports|default:"Reports" }}</h3><p>{{ ui.pl_vat_balance_sheet|default:"P&L, VAT, balance sheet" }}</p></div>
+            <span class="go">{{ ui.open_reports|default:"Open reports" }} <span aria-hidden="true">&#8594;</span></span>
+        </a>
+    </div>
+</section>
+</div>
+
+<div class="split-grid">
+    <div class="card table-card" style="padding:0;overflow:hidden;margin:0">
+        <div class="card-header">
+            <h2>{{ ui.recent_invoices|default:"Recent invoices" }}</h2>
+            <a href="{% url 'sales_report' %}" class="btn btn-secondary btn-sm">{{ ui.view_all|default:"View all" }}</a>
+        </div>
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>{{ ui.invoice|default:"Invoice" }}</th>
+                        <th>{{ ui.customer|default:"Customer" }}</th>
+                        <th>{{ ui.date|default:"Date" }}</th>
+                        <th class="text-right">{{ ui.total|default:"Total" }}</th>
+                        <th class="text-right">{{ ui.action|default:"Action" }}</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for sale in recent_sales %}
+                    <tr>
+                        <td class="fw-700 font-mono">
+                            <a href="{% url 'invoice' sale.id %}" class="link-accent">{{ sale.get_fs_number }}</a>
+                        </td>
+                        <td>
+                            {% if sale.customer %}
+                                <strong>{{ sale.customer.name }}</strong>
+                            {% else %}
+                                <span class="text-muted">{{ ui.walk_in|default:"Walk-in" }}</span>
+                            {% endif %}
+                        </td>
+                        <td class="text-muted">{{ sale.date|date:"d/m H:i" }}</td>
+                        <td class="text-right font-mono fw-700">{{ sale.total_amount|floatformat:2 }}</td>
+                        <td class="text-right" style="white-space:nowrap">
+                            <a href="{% url 'invoice' sale.id %}" class="btn btn-secondary btn-sm">{{ ui.invoice|default:"Invoice" }}</a>
+                            <a href="{% url 'invoice_pdf' sale.id %}" target="_blank" class="btn btn-secondary btn-sm">{{ ui.pdf|default:"PDF" }}</a>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="5" class="empty-state">{{ ui.no_sales|default:"No sales recorded yet." }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="card table-card" style="padding:0;overflow:hidden;margin:0">
+        <div class="card-header">
+            <h2>{{ ui.recent_proformas|default:"Recent proformas" }}</h2>
+            <a href="{% url 'proforma_list' %}" class="btn btn-secondary btn-sm">{{ ui.view_all|default:"View all" }}</a>
+        </div>
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>{{ ui.number|default:"Number" }}</th>
+                        <th>{{ ui.buyer|default:"Buyer" }}</th>
+                        <th>{{ ui.valid_until|default:"Valid until" }}</th>
+                        <th class="text-right">{{ ui.total|default:"Total" }}</th>
+                        <th class="text-right">{{ ui.action|default:"Action" }}</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for p in recent_proformas %}
+                    <tr>
+                        <td class="fw-700 font-mono">
+                            <a href="{% url 'proforma_detail' p.id %}" class="link-accent">{{ p.proforma_number }}</a>
+                        </td>
+                        <td><strong>{{ p.buyer_company|default:p.buyer_name }}</strong></td>
+                        <td class="text-muted">{{ p.valid_until|date:"d/m/Y" }}</td>
+                        <td class="text-right font-mono fw-700">{{ p.total_amount|floatformat:2 }}</td>
+                        <td class="text-right" style="white-space:nowrap">
+                            <a href="{% url 'proforma_detail' p.id %}" class="btn btn-secondary btn-sm">{{ ui.view|default:"View" }}</a>
+                            {% if p.status != 'CONVERTED' %}
+                            <a href="{% url 'proforma_convert' p.id %}" class="btn btn-sm" onclick="return confirm('{{ ui.convert_confirmation|default:'Convert this proforma into an active sale?' }}')">{{ ui.sell|default:"Sell" }}</a>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="5" class="empty-state">
+                            {{ ui.no_proformas|default:"No proformas yet." }} <a href="{% url 'proforma_create' %}" class="link-accent">{{ ui.create_one|default:"Create one" }}</a>.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
     </div>
 </div>
 
-{% if recent_sales %}
-<div class="card table-card">
-    <div class="card-header">
-        <h2 class="m-0">Recent Sales</h2>
+<section class="card dashboard-chart-card">
+    <h2>{{ ui.last_seven_days_sales|default:"Last 7 days sales (ETB)" }}</h2>
+    <div class="dashboard-chart-note">{{ ui.daily_sales|default:"Daily sales" }}</div>
+    <div class="dashboard-chart">
+        <canvas id="salesTrendChart"></canvas>
     </div>
-    <div class="table-container">
-        <table>
-            <thead>
-                <tr>
-                    <th>ID</th>
-                    <th>Date</th>
-                    <th>Total</th>
-                    <th class="text-right">Action</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for sale in recent_sales %}
-                <tr>
-                    <td class="fw-700">#{{ sale.id }}</td>
-                    <td class="text-muted">{{ sale.date|date:"M d, Y H:i" }}</td>
-                    <td class="fw-700">${{ sale.total_amount|floatformat:2 }}</td>
-                    <td class="text-right">
-                        <a href="{% url 'invoice' sale.id %}" class="btn btn-secondary btn-sm">View</a>
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    </div>
-</div>
-{% endif %}
+</section>
 
+<script src="https://cdn.jsdelivr.net/npm/chart.js" defer></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const ctx = document.getElementById('salesTrendChart');
+    if (ctx) {
+        const labels = {{ chart_sales_labels|safe }};
+        const data = {{ chart_sales_data|safe }};
+        const isLight = document.documentElement.classList.contains('light');
+        const tick = isLight ? '#64748b' : '#94a3b8';
+        const grid = isLight ? 'rgba(15,23,42,0.08)' : 'rgba(255,255,255,0.06)';
+
+        new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: '{{ ui.daily_sales|default:"Daily Sales (ETB)" }}',
+                    data: data,
+                    borderColor: '#0f766e',
+                    backgroundColor: 'rgba(15, 118, 110, 0.12)',
+                    borderWidth: 2,
+                    fill: true,
+                    tension: 0.35,
+                    pointBackgroundColor: '#0f766e',
+                    pointRadius: 3,
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+                scales: {
+                    x: { ticks: { color: tick }, grid: { display: false } },
+                    y: {
+                        beginAtZero: true,
+                        ticks: {
+                            color: tick,
+                            callback: function(val) { return val.toLocaleString(); }
+                        },
+                        grid: { color: grid }
+                    }
+                }
+            }
+        });
+    }
+});
+</script>
+
+</div>
 {% endblock %}

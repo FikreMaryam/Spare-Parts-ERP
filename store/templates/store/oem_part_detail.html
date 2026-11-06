@@ -1,0 +1,216 @@
+{% extends 'store/base.html' %}
+
+{% block title %}[{{ product.part_number|default:product.sku }}] {{ product.name }} | PARTSOUQ OEM Part Detail{% endblock %}
+
+{% block extra_head %}
+<style>
+    .part-detail-card { background: white; border: 1px solid var(--border-color); border-radius: 10px; padding: 25px; margin-bottom: 24px; }
+    .part-detail-header { display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 20px; border-bottom: 1px solid #f1f5f9; padding-bottom: 20px; margin-bottom: 20px; }
+    
+    .oem-part-number-large { font-family: monospace; font-size: 1.8rem; font-weight: 800; color: var(--accent-blue); background: #f0f9ff; padding: 6px 16px; border-radius: 6px; display: inline-block; margin-bottom: 10px; border: 1px solid #bae6fd; }
+    .part-title-large { font-family: 'Outfit', sans-serif; font-size: 1.6rem; font-weight: 800; color: var(--header-navy); line-height: 1.2; }
+
+    .price-box { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 20px; text-align: center; min-width: 220px; }
+    .price-amount { font-family: 'Outfit', sans-serif; font-size: 2.2rem; font-weight: 800; color: var(--header-navy); }
+
+    .specs-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 20px; }
+    .spec-item { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px 16px; }
+    .spec-label { font-size: 0.75rem; text-transform: uppercase; color: var(--text-muted); font-weight: 700; letter-spacing: 0.5px; }
+    .spec-value { font-weight: 700; color: var(--header-navy); font-size: 1rem; margin-top: 4px; }
+
+    /* Substitutes & Fitment Tables */
+    .substitutes-table, .fitment-table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+    .substitutes-table th, .fitment-table th { background: #0f172a; color: white; padding: 10px 14px; text-align: left; font-size: 0.8rem; text-transform: uppercase; }
+    .substitutes-table td, .fitment-table td { padding: 12px 14px; border-bottom: 1px solid #f1f5f9; }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<!-- Main Product Info Card -->
+<div class="part-detail-card">
+    <div class="part-detail-header">
+        <div style="display: flex; gap: 20px; align-items: center; flex: 1;">
+            <div style="width: 140px; height: 140px; border-radius: 10px; overflow: hidden; background: #f8fafc; border: 1px solid #e2e8f0; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+                {% if product.image %}
+                <img src="{{ product.image.url }}" alt="{{ product.name }}" style="width: 100%; height: 100%; object-fit: cover;">
+                {% else %}
+                <i class="fa-solid fa-gears" style="font-size: 3rem; color: #cbd5e1;"></i>
+                {% endif %}
+            </div>
+            <div>
+                <div class="oem-part-number-large">{{ product.part_number|default:product.sku }}</div>
+                <h1 class="part-title-large">{{ product.name }}</h1>
+                <div style="margin-top: 10px; display: flex; gap: 10px; align-items: center;">
+                    {% if product.is_genuine %}
+                    <span class="badge badge-genuine" style="font-size: 0.85rem; padding: 4px 10px;"><i class="fa-solid fa-shield-halved"></i> Genuine OEM Part</span>
+                    {% else %}
+                    <span class="badge badge-aftermarket" style="font-size: 0.85rem; padding: 4px 10px;">Aftermarket Replacement</span>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Price & Action -->
+        <div class="price-box">
+            <div style="font-size: 0.8rem; color: var(--text-muted); text-transform: uppercase; font-weight: 700;">Retail Shop Price</div>
+            <div class="price-amount">${{ product.selling_price|floatformat:2 }}</div>
+            <div style="margin-top: 10px;">
+                {% if product.quantity > 0 %}
+                <span class="badge badge-stock me-2"><i class="fa-solid fa-check-circle"></i> In Stock</span>
+                <a href="{% url 'store:add_to_cart' product.id %}" class="btn btn-success mt-2" style="width: 100%;">
+                    <i class="fa-solid fa-cart-plus"></i> Add to Cart
+                </a>
+                {% else %}
+                <span class="badge" style="background:#fee2e2; color:#991b1b;">Out of Stock</span>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Product Specifications Grid -->
+    <div class="specs-grid">
+        <div class="spec-item">
+            <div class="spec-label">Manufacturer Brand</div>
+            <div class="spec-value">{{ product.manufacturer_brand|default:product.brand }}</div>
+        </div>
+        <div class="spec-item">
+            <div class="spec-label">Part Purpose / Assembly</div>
+            <div class="spec-value">{{ product.purpose|default:"Spare Part" }}</div>
+        </div>
+        <div class="spec-item">
+            <div class="spec-label">Alternate Cross Numbers</div>
+            <div class="spec-value" style="font-family: monospace; font-size: 0.85rem;">
+                {{ product.alternate_numbers|default:"None listed" }}
+            </div>
+        </div>
+        <div class="spec-item">
+            <div class="spec-label">Shop Warehouse Bin</div>
+            <div class="spec-value" style="color: var(--accent-blue);">{{ product.shelf_bin|default:product.location|default:"Bin A-1" }}</div>
+        </div>
+    </div>
+
+    <div>
+        <h3 style="font-family: 'Outfit', sans-serif; font-size: 1.1rem; color: var(--header-navy); margin-bottom: 8px;">
+            <i class="fa-solid fa-align-left text-accent me-1"></i> Part Description & Application
+        </h3>
+        <p style="color: var(--text-dark); font-size: 0.95rem; line-height: 1.6;">
+            {{ product.vehicle_application|default:"Standard genuine OEM component designed to meet exact factory vehicle specifications." }}
+        </p>
+    </div>
+</div>
+
+<!-- Cross References & Substitutes Table -->
+<div class="card">
+    <div class="section-header">
+        <h2 class="section-title"><i class="fa-solid fa-code-compare"></i> Interchangeable Substitutes & Aftermarket Alternatives</h2>
+        <span class="badge badge-aftermarket">OEM Cross Reference</span>
+    </div>
+
+    <table class="substitutes-table">
+        <thead>
+            <tr>
+                <th>Brand / Type</th>
+                <th>Part Number</th>
+                <th>Description</th>
+                <th>Price</th>
+                <th>Shop Stock</th>
+                <th>Action</th>
+            </tr>
+        </thead>
+        <tbody>
+            <!-- Original Part Row -->
+            <tr style="background: #f0f9ff;">
+                <td>
+                    <span class="badge badge-genuine"><i class="fa-solid fa-star"></i> Selected OEM</span>
+                </td>
+                <td style="font-family: monospace; font-weight: 700; color: var(--accent-blue);">
+                    {{ product.part_number|default:product.sku }}
+                </td>
+                <td style="font-weight: 600;">{{ product.name }}</td>
+                <td style="font-weight: 800; color: var(--header-navy);">${{ product.selling_price|floatformat:2 }}</td>
+                <td><span class="badge badge-stock" data-en="In Stock" data-am="በክምችት ላይ አለ">In Stock</span></td>
+                <td><span class="badge badge-shelf" data-en="Current Selection" data-am="የተመረጠው ፓርት">Current Selection</span></td>
+            </tr>
+
+            {% for sub in substitutes %}
+            <tr>
+                <td>
+                    <span class="badge badge-aftermarket">{{ sub.get_substitute_type_display }}</span>
+                    <div style="font-size: 0.75rem; color: var(--text-muted);">{{ sub.substitute_product.brand }}</div>
+                </td>
+                <td style="font-family: monospace; font-weight: 700;">
+                    <a href="{% url 'store:oem_part_detail' sub.substitute_product.id %}" style="color: var(--accent-blue); text-decoration: none;">
+                        {{ sub.substitute_product.part_number|default:sub.substitute_product.sku }}
+                    </a>
+                </td>
+                <td>{{ sub.substitute_product.name }}</td>
+                <td style="font-weight: 800;">${{ sub.substitute_product.selling_price|floatformat:2 }}</td>
+                <td>
+                    {% if sub.substitute_product.quantity > 0 %}
+                    <span class="badge badge-stock" data-en="In Stock" data-am="በክምችት ላይ አለ">In Stock</span>
+                    {% else %}
+                    <span class="badge" style="background:#fee2e2; color:#991b1b;" data-en="Out of Stock" data-am="ያለቀ">Out of Stock</span>
+                    {% endif %}
+                </td>
+                <td>
+                    <a href="{% url 'store:add_to_cart' sub.substitute_product.id %}" class="btn btn-outline btn-sm">
+                        <i class="fa-solid fa-cart-plus"></i> <span data-en="Add" data-am="ጨምር">Add</span>
+                    </a>
+                </td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="6" class="text-muted" style="padding: 16px;" data-en="No additional substitute parts registered." data-am="ተጨማሪ የተቀየረ ፓርት አልተመዘገበም።">
+                    No additional substitute parts registered.
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<!-- Vehicle Compatibility Fitment List -->
+<div class="card">
+    <div class="section-header">
+        <h2 class="section-title">
+            <i class="fa-solid fa-car-side"></i>
+            <span data-en="Vehicle Compatibility & Fitment List" data-am="የሚስማማቸው የመኪና አይነቶች ዝርዝር">Vehicle Compatibility & Fitment List</span>
+        </h2>
+    </div>
+
+    <table class="fitment-table">
+        <thead>
+            <tr>
+                <th data-en="Car Make" data-am="የመኪና ብራንድ">Car Make</th>
+                <th data-en="Model Name" data-am="የሞዴል ስም">Model Name</th>
+                <th data-en="Year Range" data-am="የተመረተበት ዓመት">Year Range</th>
+                <th data-en="Engine Type" data-am="የሞተር አይነት">Engine Type</th>
+                <th data-en="Chassis Code" data-am="የቻሲስ ኮድ">Chassis Code</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for car in compatibilities %}
+            <tr>
+                <td style="font-weight: 700;">{{ car.make.name }}</td>
+                <td>
+                    <a href="{% url 'store:vehicle_categories' car.id %}" style="color: var(--accent-blue); font-weight: 600; text-decoration: none;">
+                        {{ car.name }}
+                    </a>
+                </td>
+                <td>{{ car.year_from|default:"" }} - {{ car.year_to|default:"Present" }}</td>
+                <td>{{ car.engine_type|default:"N/A" }}</td>
+                <td style="font-family: monospace;">{{ car.chassis_prefixes|default:"N/A" }}</td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="5" style="padding: 16px; color: var(--text-muted);">
+                    <span data-en="Fits multiple vehicle applications:" data-am="ለተለያዩ የመኪና አይነቶች የሚስማማ:">Fits multiple vehicle applications:</span> {{ product.vehicle_application|default:"Universal fitment" }}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+{% endblock %}

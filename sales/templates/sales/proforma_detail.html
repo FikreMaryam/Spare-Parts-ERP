@@ -1,0 +1,551 @@
+{% extends "base.html" %}
+
+{% block title %}የዋጋ ማቅረቢያ ፕሮፎርማ / Proforma #{{ proforma.proforma_number }} - {{ app_name }}{% endblock %}
+
+{% block page_title %}Official Proforma Invoice (ፕሮፎርማ ኢንቮይስ){% endblock %}
+
+{% block content %}
+
+<!-- Action Buttons Bar (Hidden when printing) -->
+<div class="no-print" style="display: flex; gap: 0.75rem; margin-bottom: 1.25rem; align-items: center; flex-wrap: wrap;">
+    <button onclick="window.print()" class="btn" style="background: #0f766e; color: #ffffff; font-weight: 700; display: inline-flex; align-items: center; gap: 0.5rem; cursor: pointer; border: none; padding: 0.65rem 1.35rem; border-radius: 8px; font-size: 0.95rem;">
+        🖨️ Print Single-Page Proforma (አትም)
+    </button>
+    <a href="{% url 'proforma_pdf' proforma.id %}" class="btn btn-secondary" target="_blank" style="display: inline-flex; align-items: center; gap: 0.5rem; font-weight: 600; padding: 0.65rem 1.25rem;">
+        📄 Download Vector PDF Proforma
+    </a>
+    {% if proforma.status != 'CONVERTED' %}
+    <a href="{% url 'proforma_convert' proforma.id %}" class="btn" style="background: #16a34a; color: #ffffff; font-weight: 700; display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.65rem 1.25rem; border-radius: 8px;" onclick="return confirm('Convert this proforma into an active sale? Stock will be deducted and official tax invoice issued.')">
+        ✓ Convert to Active Sale (ወደ ሽያጭ ቀይር)
+    </a>
+    {% else %}
+    <a href="{% url 'invoice' proforma.converted_sale.id %}" class="btn btn-secondary" style="display: inline-flex; align-items: center; gap: 0.5rem; font-weight: 600; padding: 0.65rem 1.25rem;">
+        🧾 View Converted Tax Invoice #{{ proforma.converted_sale.id }}
+    </a>
+    {% endif %}
+    <a href="{% url 'proforma_list' %}" class="btn btn-secondary" style="display: inline-flex; align-items: center; gap: 0.5rem; font-weight: 600; padding: 0.65rem 1.25rem;">
+        ← Proforma List
+    </a>
+</div>
+
+<!-- Printable Document Container (Guaranteed single page for up to 15 items) -->
+<div class="printable-invoice-card card" id="printable-proforma">
+    
+    <!-- Top Header: Seller Details & Official Proforma Branding -->
+    <div class="invoice-header">
+        <div class="seller-info">
+            <div class="proforma-badge">
+                የዋጋ ማቅረቢያ ፕሮፎርማ ኢንቮይስ &nbsp;|&nbsp; OFFICIAL PROFORMA INVOICE / PRICE QUOTATION
+            </div>
+            <h1 class="shop-name">
+                {{ profile.trade_name|default:profile.name|default:"የመኪና መለዋወጫ መደብር / CAR SPARE PARTS SHOP" }}
+            </h1>
+            <div class="seller-meta">
+                <span>📍 <strong>አድራሻ / Address:</strong> {{ profile.address|default:"Woreda 07 Teklehaymanot, Addis Hope Building, AHG-022, Addis Ababa, Ethiopia" }}</span>
+            </div>
+            <div class="tax-ids">
+                <span class="id-item"><span class="lbl">የሻጭ ግ.ከ.መ.ቁ (TIN):</span> <strong>{{ profile.tin_number|default:"0081095335" }}</strong></span>
+                <span class="sep">|</span>
+                <span class="id-item"><span class="lbl">የተ.እ.ታ ቁጥር (VAT Reg):</span> <strong>{{ profile.vat_number|default:"42178020821" }}</strong></span>
+                {% if profile.phone %}
+                <span class="sep">|</span>
+                <span class="id-item"><span class="lbl">ስልክ / Tel:</span> <strong>{{ profile.phone }}</strong></span>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="proforma-receipt-box">
+            <div class="receipt-title">የፕሮፎርማ ቁጥር / PROFORMA REF</div>
+            <div class="prf-num">{{ proforma.proforma_number }}</div>
+            <div class="meta-row"><strong>የተዘጋጀበት ቀን (Date):</strong> {{ proforma.date|date:"d/m/Y" }}</div>
+            <div class="meta-row" style="color: #b91c1c;"><strong>የሚያበቃበት ቀን (Valid Until):</strong> <strong>{{ proforma.valid_until|date:"d/m/Y" }}</strong></div>
+            {% if proforma.warehouse %}
+            <div class="meta-row"><strong>መደብር / Shop:</strong> {{ proforma.warehouse.name }}</div>
+            {% endif %}
+            <div class="meta-row"><strong>ያዘጋጀው (Prepared By):</strong> {{ proforma.created_by.get_full_name|default:proforma.created_by.username|default:"Staff" }}</div>
+        </div>
+    </div>
+
+    <!-- Billed To (Buyer) & Validity Box -->
+    <div class="buyer-section">
+        <div class="buyer-col">
+            <span class="section-title">ለ (የደንበኛው / የገዢው ዝርዝር መረጃ) / QUOTATION PREPARED FOR:</span>
+            <div class="buyer-name">{{ proforma.buyer_company|default:proforma.buyer_name }}</div>
+            {% if proforma.buyer_company and proforma.buyer_name %}
+            <div class="buyer-sub">ተወካይ / Contact: <strong>{{ proforma.buyer_name }}</strong></div>
+            {% endif %}
+            <div class="buyer-meta-grid">
+                <div><strong>የገዢ ግ.ከ.መ.ቁ (TIN):</strong> <span class="mono">{{ proforma.buyer_tin|default:"የችርቻሮ / Unregistered" }}</span></div>
+                {% if proforma.buyer_phone %}
+                <div><strong>ስልክ / Phone:</strong> {{ proforma.buyer_phone }}</div>
+                {% endif %}
+                {% if proforma.buyer_address %}
+                <div><strong>አድራሻ / Address:</strong> {{ proforma.buyer_address }}</div>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="status-col">
+            {% if proforma.status == 'CONVERTED' %}
+            <div class="status-badge" style="background: #dcfce7; color: #15803d; border-color: #86efac;">✓ የተሸጠ / CONVERTED TO SALE</div>
+            {% else %}
+            <div class="status-badge" style="background: #e0f2fe; color: #0369a1; border-color: #7dd3fc;">የዋጋ ማቅረቢያ / ACTIVE QUOTATION</div>
+            {% endif %}
+            <div class="tax-rule-note">
+                <div>ተጨማሪ እሴት ታክስ / VAT: <strong>15.00% (ተካቷል)</strong></div>
+                <div>የገንዘብ ዓይነት / Currency: <strong>ETB (የኢትዮጵያ ብር)</strong></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Line Items Table -->
+    <div class="items-table-wrap">
+        <table class="items-table">
+            <thead>
+                <tr>
+                    <th style="width: 4%;">ተ.ቁ<br><span class="en-th">#</span></th>
+                    <th style="width: 20%;">የዕቃ ቁጥር / OEM<br><span class="en-th">Part Number / SKU</span></th>
+                    <th style="width: 40%;">የዕቃው ዓይነትና ዝርዝር መግለጫ<br><span class="en-th">Spare Part Description & Fitment</span></th>
+                    <th style="width: 8%; text-align: center;">መለኪያ<br><span class="en-th">Unit</span></th>
+                    <th style="width: 8%; text-align: center;">ብዛት<br><span class="en-th">Qty</span></th>
+                    <th style="width: 10%; text-align: right;">ነጠላ ዋጋ<br><span class="en-th">Unit Price</span></th>
+                    <th style="width: 10%; text-align: right;">ጠቅላላ ዋጋ<br><span class="en-th">Total (ETB)</span></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in proforma.items.all %}
+                <tr>
+                    <td class="text-center muted-idx">{{ forloop.counter }}</td>
+                    <td class="mono bold-sku">
+                        {{ item.part_number|default:item.product.part_number|default:"—" }}
+                    </td>
+                    <td>
+                        <div class="part-name">{{ item.description }}</div>
+                    </td>
+                    <td class="text-center uom-cell">{{ item.unit|default:"Pcs" }}</td>
+                    <td class="text-center bold-qty">{{ item.quantity }}</td>
+                    <td class="text-right mono">{{ item.unit_price|floatformat:2 }}</td>
+                    <td class="text-right mono bold-total">{{ item.line_total|floatformat:2 }}</td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="7" class="text-center" style="padding: 1rem;">ምንም የተመዘገበ ዕቃ የለም / No items recorded.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Summary Box & Commercial Terms Section -->
+    <div class="invoice-bottom-grid">
+        <div class="terms-col">
+            <div class="terms-title">የሽያጭና የክፍያ ውል ሁኔታዎች / Commercial Terms & Conditions:</div>
+            <ul class="terms-list">
+                <li><strong>የማስረከቢያ ቦታ (Delivery):</strong> {{ proforma.delivery_terms|default:"Ex-store Addis Ababa" }}</li>
+                <li><strong>የክፍያ ሁኔታ (Payment Terms):</strong> {{ proforma.payment_terms|default:"100% Cash / Bank Transfer upon delivery" }}</li>
+                <li><strong>ተጨማሪ ማስታወሻ:</strong> {{ proforma.notes|default:"All prices include 15% VAT. Quotation valid until specified expiry date." }}</li>
+                <li>ይህ ፕሮፎርማ ይፋዊ የዋጋ ማቅረቢያ ሲሆን ክፍያ ሲፈጸም ሕጋዊ የታክስ ደረሰኝ (VAT Sales Receipt) ይሰጣል።</li>
+            </ul>
+        </div>
+
+        <div class="totals-col">
+            <div class="total-line">
+                <span class="t-lbl">ከታክስ በፊት ድምር (Subtotal):</span>
+                <span class="t-val mono">{{ proforma.calculated_subtotal|floatformat:2 }} ETB</span>
+            </div>
+            <div class="total-line">
+                <span class="t-lbl">የተጨማሪ እሴት ታክስ (15% VAT):</span>
+                <span class="t-val mono">{{ proforma.calculated_vat|floatformat:2 }} ETB</span>
+            </div>
+            <div class="grand-total-line">
+                <span class="gt-lbl">ጠቅላላ የፕሮፎርማ ድምር:</span>
+                <span class="gt-val mono">{{ proforma.total_amount|floatformat:2 }} ETB</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Legal Footer Bar -->
+    <div class="legal-footer">
+        <div class="legal-title">
+            ይፋዊ የዋጋ ማቅረቢያ ፕሮፎርማ ኢንቮይስ - አዲስ አበባ ፣ ኢትዮጵያ / OFFICIAL PROFORMA INVOICE
+        </div>
+        <div>
+            Seller TIN: <strong>{{ profile.tin_number|default:"0081095335" }}</strong> &nbsp;|&nbsp; 
+            VAT No: <strong>{{ profile.vat_number|default:"42178020821" }}</strong> &nbsp;|&nbsp; 
+            ስለመረጡን እናመሰግናለን! / Thank you for choosing our car spare parts shop!
+        </div>
+    </div>
+
+</div>
+
+<!-- High-Density Single-Page CSS & Print Stylesheet -->
+<style>
+.printable-invoice-card {
+    background: #ffffff;
+    color: #111827;
+    padding: 1.25rem 1.5rem;
+    border-radius: 8px;
+    max-width: 860px;
+    margin: 0 auto;
+    border: 1px solid #d1d5db;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Abyssinica SIL", "Noto Sans Ethiopic", sans-serif;
+    line-height: 1.25;
+}
+
+.invoice-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    border-bottom: 2px solid #0f766e;
+    padding-bottom: 0.65rem;
+    margin-bottom: 0.65rem;
+    gap: 1rem;
+}
+
+.proforma-badge {
+    display: inline-block;
+    background: #0f766e;
+    color: #ffffff;
+    font-size: 0.68rem;
+    font-weight: 800;
+    padding: 0.15rem 0.5rem;
+    border-radius: 3px;
+    letter-spacing: 0.04em;
+    margin-bottom: 0.25rem;
+}
+
+.shop-name {
+    font-size: 1.25rem;
+    font-weight: 800;
+    margin: 0;
+    color: #111827;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+}
+
+.seller-meta {
+    font-size: 0.76rem;
+    color: #4b5563;
+    margin-top: 0.2rem;
+}
+
+.tax-ids {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    font-size: 0.78rem;
+    color: #1f2937;
+    margin-top: 0.25rem;
+}
+.tax-ids .sep { color: #9ca3af; }
+.tax-ids .lbl { font-weight: 700; color: #0f766e; }
+
+.proforma-receipt-box {
+    background: #f0fdfa;
+    border: 1.5px solid #0f766e;
+    border-radius: 6px;
+    padding: 0.5rem 0.75rem;
+    text-align: right;
+    min-width: 220px;
+}
+.receipt-title {
+    font-size: 0.65rem;
+    font-weight: 800;
+    color: #0f766e;
+    text-transform: uppercase;
+}
+.prf-num {
+    font-size: 1.15rem;
+    font-weight: 800;
+    color: #0f766e;
+    font-family: monospace;
+    letter-spacing: 0.05em;
+    margin: 0.1rem 0;
+}
+.meta-row {
+    font-size: 0.72rem;
+    color: #374151;
+    margin-top: 0.1rem;
+}
+
+/* Buyer & Status Box */
+.buyer-section {
+    display: flex;
+    justify-content: space-between;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+    padding: 0.6rem 0.85rem;
+    margin-bottom: 0.65rem;
+    gap: 1rem;
+}
+.section-title {
+    font-size: 0.68rem;
+    font-weight: 800;
+    color: #64748b;
+    text-transform: uppercase;
+    display: block;
+    margin-bottom: 0.2rem;
+}
+.buyer-name {
+    font-size: 0.95rem;
+    font-weight: 800;
+    color: #0f172a;
+}
+.buyer-sub {
+    font-size: 0.75rem;
+    color: #475569;
+}
+.buyer-meta-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    font-size: 0.75rem;
+    color: #334155;
+    margin-top: 0.25rem;
+}
+.status-col {
+    text-align: right;
+}
+.status-badge {
+    display: inline-block;
+    font-size: 0.72rem;
+    font-weight: 800;
+    padding: 0.15rem 0.5rem;
+    border-radius: 12px;
+    border: 1px solid;
+}
+.tax-rule-note {
+    font-size: 0.7rem;
+    color: #64748b;
+    margin-top: 0.35rem;
+}
+
+/* Items Table */
+.items-table-wrap {
+    margin-bottom: 0.65rem;
+}
+.items-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.75rem;
+}
+.items-table th {
+    background: #f1f5f9;
+    color: #1e293b;
+    font-weight: 800;
+    padding: 0.35rem 0.45rem;
+    border-top: 1px solid #cbd5e1;
+    border-bottom: 2px solid #0f766e;
+    text-align: left;
+    line-height: 1.1;
+}
+.en-th {
+    font-size: 0.65rem;
+    font-weight: 600;
+    color: #64748b;
+}
+.items-table td {
+    padding: 0.3rem 0.45rem;
+    border-bottom: 1px solid #e2e8f0;
+    vertical-align: middle;
+}
+.items-table tr:last-child td {
+    border-bottom: 1.5px solid #0f766e;
+}
+.part-name {
+    font-weight: 700;
+    color: #0f172a;
+}
+.uom-cell {
+    font-size: 0.72rem;
+    color: #475569;
+}
+.bold-qty { font-weight: 800; font-size: 0.82rem; }
+.bold-sku { font-size: 0.76rem; }
+.bold-total { font-weight: 800; color: #0f172a; }
+.text-center { text-align: center; }
+.text-right { text-align: right; }
+.mono { font-family: monospace; }
+.muted-idx { color: #94a3b8; font-weight: 700; }
+
+/* Totals & Bottom Section */
+.invoice-bottom-grid {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 1.5rem;
+    margin-bottom: 0.5rem;
+}
+.terms-col {
+    flex: 1;
+    font-size: 0.7rem;
+    color: #64748b;
+}
+.terms-title {
+    font-weight: 800;
+    color: #334155;
+    margin-bottom: 0.2rem;
+}
+.terms-list {
+    margin: 0;
+    padding-left: 1.1rem;
+    line-height: 1.25;
+}
+.totals-col {
+    width: 280px;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+    padding: 0.45rem 0.75rem;
+}
+.total-line {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.75rem;
+    color: #475569;
+    padding: 0.15rem 0;
+}
+.grand-total-line {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.95rem;
+    font-weight: 900;
+    color: #0f766e;
+    border-top: 1.5px dashed #0f766e;
+    margin-top: 0.25rem;
+    padding-top: 0.3rem;
+}
+
+/* Legal Footer */
+.legal-footer {
+    border-top: 1px solid #e2e8f0;
+    padding-top: 0.4rem;
+    text-align: center;
+    font-size: 0.65rem;
+    color: #64748b;
+    line-height: 1.2;
+}
+.legal-title {
+    font-weight: 700;
+    color: #334155;
+}
+
+/* STRICT SINGLE-PAGE PRINT STYLES */
+@page {
+    size: A4 portrait;
+    margin: 6mm 8mm 6mm 8mm;
+}
+
+@media print {
+    nav, #sidebar, .peachtree-tabs-nav, .no-print, .page-header, .sidebar-overlay, .theme-toggle-btn {
+        display: none !important;
+    }
+    
+    html, body {
+        height: auto !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        background: #ffffff !important;
+        color: #000000 !important;
+        font-size: 10pt !important;
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+    }
+
+    main, #main-content {
+        margin: 0 !important;
+        padding: 0 !important;
+        width: 100% !important;
+        max-width: 100% !important;
+    }
+
+    .printable-invoice-card {
+        box-shadow: none !important;
+        border: none !important;
+        max-width: 100% !important;
+        width: 100% !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        background: #ffffff !important;
+        color: #000000 !important;
+        font-size: 9pt !important;
+        line-height: 1.3 !important;
+        page-break-after: avoid;
+    }
+
+    .printable-invoice-card * {
+        color: #000000 !important;
+        border-color: #cbd5e1 !important;
+    }
+
+    .proforma-badge {
+        background: #0f766e !important;
+        color: #ffffff !important;
+    }
+
+    .proforma-receipt-box {
+        background: #f0fdfa !important;
+        border: 1.5px solid #0f766e !important;
+    }
+
+    .receipt-title, .prf-num, .lbl {
+        color: #0f766e !important;
+    }
+
+    .grand-total-line {
+        color: #0f766e !important;
+    }
+
+    .items-table th {
+        background: #f1f5f9 !important;
+        color: #000000 !important;
+        font-weight: 800 !important;
+        padding: 5px 5px !important;
+        font-size: 9pt !important;
+    }
+
+    .items-table td {
+        padding: 4px 5px !important;
+        font-size: 9pt !important;
+    }
+
+    .shop-name {
+        font-size: 17pt !important;
+    }
+    .prf-num {
+        font-size: 14pt !important;
+    }
+    .seller-meta, .tax-ids, .meta-row, .buyer-meta-grid, .tax-rule-note {
+        font-size: 8.5pt !important;
+    }
+    .terms-col, .total-line {
+        font-size: 8.5pt !important;
+    }
+    .legal-footer {
+        font-size: 8pt !important;
+    }
+    .invoice-header {
+        padding-bottom: 5px !important;
+        margin-bottom: 6px !important;
+    }
+    .buyer-section {
+        padding: 6px 8px !important;
+        margin-bottom: 6px !important;
+    }
+    .items-table-wrap {
+        margin-bottom: 6px !important;
+    }
+    .totals-col {
+        padding: 3px 6px !important;
+    }
+    .invoice-bottom-grid {
+        margin-bottom: 3px !important;
+    }
+    .legal-footer {
+        padding-top: 3px !important;
+    }
+}
+</style>
+
+{% endblock %}

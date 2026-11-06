@@ -1,0 +1,160 @@
+{% extends "base.html" %}
+
+{% block title %}Expenses Management - {{ app_name }}{% endblock %}
+
+{% block page_title %}Expenses Management{% endblock %}
+
+{% block content %}
+<div class="header-actions" style="margin-bottom: 2rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+    <div>
+        <h1 style="font-size: 1.75rem; font-weight: 800; margin: 0;">Expense Tracker</h1>
+        <p style="margin: 0.25rem 0 0 0; color: hsl(var(--text-muted)); font-size: 0.9rem;">Track, categorize, and export operational costs for your shop.</p>
+    </div>
+    <div style="display: flex; gap: 0.75rem; flex-wrap: wrap;">
+        <a href="{% url 'expense_export' %}?q={{ current_q }}&category={{ current_category }}&start_date={{ current_start_date }}&end_date={{ current_end_date }}" class="btn btn-secondary" style="display: inline-flex; align-items: center; gap: 0.5rem;">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width: 18px; height: 18px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>
+            Export CSV
+        </a>
+        <a href="{% url 'expense_add' %}" class="btn" style="display: inline-flex; align-items: center; gap: 0.5rem;">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width: 18px; height: 18px;"><line x1="12" x2="12" y1="5" y2="19"/><line x1="5" x2="19" y1="12" y2="12"/></svg>
+            Add New Expense
+        </a>
+    </div>
+</div>
+
+<!-- Key Metrics Cards -->
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1.25rem; margin-bottom: 2rem;">
+    <!-- Total Expenses Card -->
+    <div class="card" style="padding: 1.25rem; display: flex; align-items: center; justify-content: space-between; border-left: 4px solid hsl(var(--error));">
+        <div>
+            <p style="font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em; color: hsl(var(--text-muted)); margin: 0 0 0.35rem 0; font-weight: 600;">Total Outflow</p>
+            <h3 style="font-size: 1.75rem; margin: 0; font-weight: 800; color: hsl(var(--text));">${{ total_amount|floatformat:2 }}</h3>
+        </div>
+        <div style="background: hsla(var(--error) / 0.1); color: hsl(var(--error)); padding: 0.75rem; border-radius: 12px;">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width: 24px; height: 24px;"><rect width="20" height="12" x="2" y="6" rx="2"/><circle cx="12" cy="12" r="2"/><path d="M6 12h.01M18 12h.01"/></svg>
+        </div>
+    </div>
+
+    <!-- Transaction Count -->
+    <div class="card" style="padding: 1.25rem; display: flex; align-items: center; justify-content: space-between; border-left: 4px solid hsl(var(--accent));">
+        <div>
+            <p style="font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em; color: hsl(var(--text-muted)); margin: 0 0 0.35rem 0; font-weight: 600;">Record Count</p>
+            <h3 style="font-size: 1.75rem; margin: 0; font-weight: 800; color: hsl(var(--text));">{{ expense_count }}</h3>
+        </div>
+        <div style="background: hsla(var(--accent) / 0.1); color: hsl(var(--accent)); padding: 0.75rem; border-radius: 12px;">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width: 24px; height: 24px;"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/></svg>
+        </div>
+    </div>
+</div>
+
+<!-- Category Breakdown Section -->
+<div class="card" style="padding: 1.25rem; margin-bottom: 2rem;">
+    <h3 style="font-size: 0.95rem; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 700; margin: 0 0 1rem 0; color: hsl(var(--text-muted));">Spend Breakdown by Category</h3>
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem;">
+        {% for cat_code, cat_info in category_breakdown.items %}
+        <div style="background: hsl(var(--surface-subtle, 0, 0%, 97%)); padding: 0.85rem 1rem; border-radius: 10px; border: 1px solid hsl(var(--border));">
+            <div style="display: flex; justify-content: space-between; font-size: 0.85rem; font-weight: 600; margin-bottom: 0.25rem;">
+                <span>{{ cat_info.label }}</span>
+                <span>${{ cat_info.amount|floatformat:2 }}</span>
+            </div>
+            <div style="background: hsl(var(--border)); height: 6px; border-radius: 9999px; overflow: hidden;">
+                <div style="width: {{ cat_info.percentage }}%; height: 100%; background: 
+                    {% if cat_code == 'RENT' %}hsl(210, 100%, 50%)
+                    {% elif cat_code == 'SALARY' %}hsl(120, 70%, 40%)
+                    {% elif cat_code == 'UTILITY' %}hsl(39, 100%, 50%)
+                    {% elif cat_code == 'TRANSPORT' %}hsl(280, 100%, 50%)
+                    {% else %}hsl(0, 0%, 50%){% endif %}; transition: width 0.3s ease;">
+                </div>
+            </div>
+            <div style="text-align: right; font-size: 0.75rem; color: hsl(var(--text-muted)); margin-top: 0.25rem;">{{ cat_info.percentage }}%</div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+<!-- Filter & Search Toolbar -->
+<div class="card" style="padding: 1.25rem; margin-bottom: 1.5rem;">
+    <form method="get" action="{% url 'expense_list' %}" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; align-items: end;">
+        <div>
+            <label style="font-size: 0.8rem; font-weight: 600; color: hsl(var(--text-muted)); display: block; margin-bottom: 0.35rem;">Search Title</label>
+            <input type="text" name="q" value="{{ current_q }}" placeholder="Search expense..." class="form-control" style="width: 100%;">
+        </div>
+        <div>
+            <label style="font-size: 0.8rem; font-weight: 600; color: hsl(var(--text-muted)); display: block; margin-bottom: 0.35rem;">Category</label>
+            <select name="category" class="form-control" style="width: 100%;">
+                <option value="">All Categories</option>
+                {% for code, label in categories %}
+                <option value="{{ code }}" {% if current_category == code %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div>
+            <label style="font-size: 0.8rem; font-weight: 600; color: hsl(var(--text-muted)); display: block; margin-bottom: 0.35rem;">From Date</label>
+            <input type="date" name="start_date" value="{{ current_start_date }}" class="form-control" style="width: 100%;">
+        </div>
+        <div>
+            <label style="font-size: 0.8rem; font-weight: 600; color: hsl(var(--text-muted)); display: block; margin-bottom: 0.35rem;">To Date</label>
+            <input type="date" name="end_date" value="{{ current_end_date }}" class="form-control" style="width: 100%;">
+        </div>
+        <div style="display: flex; gap: 0.5rem;">
+            <button type="submit" class="btn" style="flex: 1;">Filter</button>
+            {% if current_q or current_category or current_start_date or current_end_date %}
+            <a href="{% url 'expense_list' %}" class="btn btn-secondary" title="Clear Filters">Reset</a>
+            {% endif %}
+        </div>
+    </form>
+</div>
+
+<!-- Expenses Table -->
+<div class="card table-card">
+    <div class="card-header" style="padding: 1.25rem 1.5rem; border-bottom: 1px solid hsl(var(--border)); display: flex; justify-content: space-between; align-items: center;">
+        <h2 class="m-0" style="font-size: 1.1rem; font-weight: 700; color: hsl(var(--text));">Expense Log</h2>
+        <span class="text-muted" style="font-size: 0.85rem;">Showing {{ expenses|length }} entries</span>
+    </div>
+    <div class="table-container">
+        <table>
+            <thead>
+                <tr>
+                    <th style="padding-left: 1.5rem;">Title</th>
+                    <th>Category</th>
+                    <th>Date</th>
+                    <th class="text-right" style="padding-right: 1.5rem;">Amount</th>
+                    <th class="text-center" style="width: 150px;">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for expense in expenses %}
+                <tr>
+                    <td style="padding-left: 1.5rem;" class="fw-700">{{ expense.title }}</td>
+                    <td>
+                        <span style="display: inline-block; padding: 0.25rem 0.75rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 700; 
+                            {% if expense.category == 'RENT' %}background: hsla(210, 100%, 50%, 0.12); color: hsl(210, 100%, 45%);
+                            {% elif expense.category == 'SALARY' %}background: hsla(120, 100%, 40%, 0.12); color: hsl(120, 100%, 35%);
+                            {% elif expense.category == 'UTILITY' %}background: hsla(39, 100%, 50%, 0.12); color: hsl(39, 100%, 45%);
+                            {% elif expense.category == 'TRANSPORT' %}background: hsla(280, 100%, 50%, 0.12); color: hsl(280, 100%, 45%);
+                            {% else %}background: hsla(0, 0%, 50%, 0.12); color: hsl(0, 0%, 45%);{% endif %}">
+                            {{ expense.get_category_display }}
+                        </span>
+                    </td>
+                    <td class="text-muted">{{ expense.date|date:"M d, Y" }}</td>
+                    <td class="text-right fw-700" style="padding-right: 1.5rem; color: hsl(var(--error));">${{ expense.amount|floatformat:2 }}</td>
+                    <td class="text-center" style="padding: 0.75rem 1rem;">
+                        <div style="display: flex; gap: 0.5rem; justify-content: center;">
+                            <a href="{% url 'expense_edit' expense.pk %}" class="btn btn-secondary btn-sm" style="padding: 0.35rem 0.75rem; font-size: 0.8rem;">Edit</a>
+                            <a href="{% url 'expense_delete' expense.pk %}" class="btn btn-danger btn-sm" style="padding: 0.35rem 0.75rem; font-size: 0.8rem;">Delete</a>
+                        </div>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="5" class="empty-state" style="padding: 3rem 1.5rem; text-align: center; color: hsl(var(--text-muted));">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="width: 48px; height: 48px; margin-bottom: 1rem; opacity: 0.5; color: hsl(var(--text-muted));"><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6"/><path d="m9 9 6 6"/></svg>
+                        <p style="margin: 0; font-size: 0.95rem;">No expenses found matching the criteria.</p>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

@@ -36,7 +36,10 @@
                             <td>{{ sale.date|date:"M d, Y H:i" }}</td>
                             <td>
                                 {% if sale.customer %}
-                                    {{ sale.customer.name }}
+                                    <strong>{{ sale.customer.name }}</strong>
+                                    {% if sale.customer.phone and sale.customer.phone != 'N/A' %}
+                                        <br><a href="tel:{{ sale.customer.phone }}" class="badge badge-success" style="font-size: 0.82rem; text-decoration: none; margin-top: 3px; display: inline-block;">📞 {{ sale.customer.phone }}</a>
+                                    {% endif %}
                                     {% if sale.customer.email %}
                                         <br><small class="text-muted">{{ sale.customer.email }}</small>
                                     {% endif %}

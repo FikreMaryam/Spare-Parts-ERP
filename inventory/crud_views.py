@@ -2,6 +2,7 @@ from django.urls import reverse_lazy
 from django.views.generic import ListView, CreateView, UpdateView, DeleteView
 from core.permissions import AdminRequiredMixin, SalesOrAdminRequiredMixin
 from .models import Product, Warehouse, Category, CarMake, CarModel, Supplier
+from .forms import ProductForm
 
 # Base classes to keep it DRY
 class AdminCRUDMixin(AdminRequiredMixin):
@@ -13,17 +14,80 @@ class AdminDeleteMixin(AdminRequiredMixin):
 # --- Product ---
 class ProductCreateView(AdminCRUDMixin, CreateView):
     model = Product
-    fields = '__all__'
+    form_class = ProductForm
+    template_name = 'inventory/product_form.html'
     success_url = reverse_lazy('product_list')
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        ctx['car_makes'] = CarMake.objects.prefetch_related('models').order_by('name')
+        ctx['selected_compatibilities'] = set()
+        return ctx
 
 class ProductUpdateView(AdminCRUDMixin, UpdateView):
     model = Product
-    fields = '__all__'
+    form_class = ProductForm
+    template_name = 'inventory/product_form.html'
     success_url = reverse_lazy('product_list')
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        ctx['car_makes'] = CarMake.objects.prefetch_related('models').order_by('name')
+        if self.object:
+            ctx['selected_compatibilities'] = set(self.object.compatibilities.values_list('id', flat=True))
+        else:
+            ctx['selected_compatibilities'] = set()
+        return ctx
+
+from django.contrib import messages
+from django.shortcuts import redirect
+
+from django.db import transaction
+from django.db.models.signals import post_delete
 
 class ProductDeleteView(AdminDeleteMixin, DeleteView):
     model = Product
     success_url = reverse_lazy('product_list')
+
+    def form_valid(self, form):
+        obj = self.get_object()
+        product_name = str(obj)
+        try:
+            with transaction.atomic():
+                from sales.models import SaleItem, Cart
+                from sales.signals import restore_inventory_on_sale_delete
+                from .models import StockMovement, PurchaseItem, PartSubstitute, DiagramCallout
+                
+                # 1. Unlink callouts
+                DiagramCallout.objects.filter(product=obj).update(product=None)
+                
+                # 2. Delete substitutes & cart items
+                PartSubstitute.objects.filter(original_product=obj).delete()
+                PartSubstitute.objects.filter(substitute_product=obj).delete()
+                Cart.objects.filter(product=obj).delete()
+                PurchaseItem.objects.filter(product=obj).delete()
+                
+                # 3. Safely delete SaleItems without triggering inventory restore signals
+                post_delete.disconnect(restore_inventory_on_sale_delete, sender=SaleItem)
+                try:
+                    SaleItem.objects.filter(product=obj).delete()
+                finally:
+                    post_delete.connect(restore_inventory_on_sale_delete, sender=SaleItem)
+                
+                # 4. Delete stock movements
+                StockMovement.objects.filter(product=obj).delete()
+                
+                # 5. Finally delete product
+                obj.delete()
+                
+            messages.success(self.request, f"Product '{product_name}' was deleted successfully.")
+            return redirect(self.success_url)
+        except Exception as e:
+            messages.error(self.request, f"Could not delete product '{product_name}': {e}")
+            return redirect('product_list')
+
+    def delete(self, request, *args, **kwargs):
+        return self.form_valid(None)
 
 # --- Warehouse ---
 class WarehouseCreateView(AdminCRUDMixin, CreateView):
@@ -84,8 +148,18 @@ class CarMakeDeleteView(AdminDeleteMixin, DeleteView):
     success_url = reverse_lazy('carmake_list')
 
 # --- CarModel ---
-class CarModelListView(GenericListView):
+class CarModelListView(SalesOrAdminRequiredMixin, ListView):
     model = CarModel
+    template_name = 'inventory/carmodel_list.html'
+    context_object_name = 'carmodels'
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        makes = CarMake.objects.prefetch_related('models').order_by('name')
+        ctx['makes'] = makes
+        ctx['total_models'] = CarModel.objects.count()
+        ctx['total_makes'] = makes.count()
+        return ctx
 class CarModelCreateView(AdminCRUDMixin, CreateView):
     model = CarModel
     fields = ['make', 'name', 'year_from', 'year_to', 'engine_type', 'chassis_prefixes']

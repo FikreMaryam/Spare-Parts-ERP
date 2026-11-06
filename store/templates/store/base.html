@@ -3,44 +3,304 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}Shop Website{% endblock %}</title>
+    <title>{% block title %}PARTSOUQ | OEM Auto Spare Parts Catalog & ERP Shop{% endblock %}</title>
+    <!-- Google Fonts & FontAwesome icons -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Outfit:wght@500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
     <style>
         :root {
-            --primary: #007bff;
-            --secondary: #6c757d;
-            --success: #28a745;
-            --danger: #dc3545;
-            --light: #f8f9fa;
-            --dark: #343a40;
-            --bg: #ffffff;
-            --text: #212529;
-            --border: #dee2e6;
+            --bg-dark: #0b132b;
+            --header-navy: #1c2541;
+            --accent-blue: #0284c7;
+            --accent-light: #38bdf8;
+            --accent-green: #10b981;
+            --accent-amber: #f59e0b;
+            --text-dark: #0f172a;
+            --text-muted: #64748b;
+            --bg-light: #f8fafc;
+            --card-bg: #ffffff;
+            --border-color: #e2e8f0;
+            --radius: 8px;
         }
-        * { box-sizing: border-box; }
-        body { font-family: Arial, sans-serif; margin: 0; padding: 0; background: var(--bg); color: var(--text); }
-        header { background: var(--dark); color: white; padding: 1rem; text-align: center; }
-        nav { background: var(--light); padding: 0.5rem; }
-        nav a { margin: 0 1rem; text-decoration: none; color: var(--text); }
-        nav a:hover { color: var(--primary); }
-        main { padding: 1rem; }
-        .btn { display: inline-block; padding: 0.5rem 1rem; background: var(--primary); color: white; text-decoration: none; border-radius: 4px; border: none; cursor: pointer; }
-        .btn:hover { background: #0056b3; }
-        .card { background: white; border: 1px solid var(--border); border-radius: 8px; padding: 1rem; margin: 1rem 0; }
-        .product-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 1rem; }
-        .product-card { border: 1px solid var(--border); border-radius: 8px; padding: 1rem; text-align: center; }
-        .product-card img { max-width: 100%; height: 150px; object-fit: cover; }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: 'Inter', sans-serif; background-color: var(--bg-light); color: var(--text-dark); line-height: 1.5; }
+
+        /* Top Bar */
+        .top-bar { background: var(--bg-dark); color: #94a3b8; padding: 6px 20px; font-size: 0.85rem; display: flex; justify-content: space-between; align-items: center; }
+        .top-bar a { color: var(--accent-light); text-decoration: none; font-weight: 500; }
+        .top-bar a:hover { text-decoration: underline; }
+
+        /* Main Header */
+        header { background: var(--header-navy); color: white; padding: 15px 20px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
+        .header-container { max-width: 1300px; margin: 0 auto; display: flex; align-items: center; justify-content: space-between; gap: 20px; flex-wrap: wrap; }
+        
+        .brand-logo { display: flex; align-items: center; gap: 12px; text-decoration: none; color: white; }
+        .brand-icon { background: linear-gradient(135deg, #0284c7, #2563eb); width: 44px; height: 44px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 1.4rem; color: white; box-shadow: 0 4px 10px rgba(2,132,199,0.4); }
+        .brand-text h1 { font-family: 'Outfit', sans-serif; font-size: 1.4rem; font-weight: 800; tracking-letter: 0.5px; line-height: 1.1; }
+        .brand-text span { font-size: 0.75rem; color: #94a3b8; text-transform: uppercase; letter-spacing: 1px; }
+
+        /* Header Quick Search Box */
+        .header-search { flex: 1; max-width: 650px; }
+        .search-form-tabs { display: flex; gap: 4px; margin-bottom: 6px; }
+        .tab-btn { background: rgba(255,255,255,0.1); color: #cbd5e1; border: none; padding: 4px 12px; font-size: 0.8rem; border-radius: 4px 4px 0 0; cursor: pointer; font-weight: 500; }
+        .tab-btn.active { background: var(--accent-blue); color: white; }
+
+        .search-input-group { display: flex; background: white; border-radius: 6px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.2); }
+        .search-input-group input { flex: 1; border: none; padding: 10px 16px; font-size: 0.95rem; outline: none; font-family: 'Inter', sans-serif; }
+        .search-input-group button { background: var(--accent-blue); color: white; border: none; padding: 0 20px; font-weight: 600; cursor: pointer; transition: background 0.2s; }
+        .search-input-group button:hover { background: #02649b; }
+
+        /* Header Actions */
+        .header-actions { display: flex; align-items: center; gap: 16px; }
+        .header-btn { display: flex; align-items: center; gap: 8px; background: rgba(255,255,255,0.08); color: white; padding: 8px 14px; border-radius: 6px; text-decoration: none; font-size: 0.9rem; font-weight: 500; transition: background 0.2s; }
+        .header-btn:hover { background: rgba(255,255,255,0.18); }
+        .cart-badge { background: var(--accent-blue); color: white; border-radius: 12px; padding: 2px 8px; font-size: 0.75rem; font-weight: 700; }
+
+        /* Secondary Nav */
+        nav.nav-bar { background: #0f172a; border-top: 1px solid rgba(255,255,255,0.05); }
+        .nav-container { max-width: 1300px; margin: 0 auto; display: flex; gap: 24px; padding: 0 20px; overflow-x: auto; }
+        .nav-link { color: #cbd5e1; text-decoration: none; padding: 10px 0; font-size: 0.9rem; font-weight: 500; display: flex; align-items: center; gap: 8px; white-space: nowrap; border-bottom: 2px solid transparent; }
+        .nav-link:hover, .nav-link.active { color: var(--accent-light); border-bottom-color: var(--accent-light); }
+
+        /* Main Content */
+        main { max-width: 1300px; margin: 25px auto; padding: 0 20px; }
+
+        /* General Alerts & Messages */
+        .messages-container { margin-bottom: 20px; }
+        .alert { padding: 12px 16px; border-radius: 6px; font-size: 0.9rem; font-weight: 500; margin-bottom: 10px; display: flex; align-items: center; justify-content: space-between; }
+        .alert-success { background: #d1fae5; color: #065f46; border: 1px solid #a7f3d0; }
+        .alert-warning { background: #fef3c7; color: #92400e; border: 1px solid #fde68a; }
+        .alert-error { background: #fee2e2; color: #991b1b; border: 1px solid #fca5a5; }
+
+        /* Common Component UI */
+        .card { background: var(--card-bg); border-radius: var(--radius); border: 1px solid var(--border-color); box-shadow: 0 2px 4px rgba(0,0,0,0.04); padding: 20px; margin-bottom: 24px; }
+        .section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; border-bottom: 2px solid #f1f5f9; padding-bottom: 10px; }
+        .section-title { font-family: 'Outfit', sans-serif; font-size: 1.25rem; font-weight: 700; color: var(--header-navy); display: flex; align-items: center; gap: 10px; }
+        .section-title i { color: var(--accent-blue); }
+
+        /* Badges */
+        .badge { display: inline-block; padding: 3px 8px; border-radius: 4px; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; }
+        .badge-genuine { background: #dcfce7; color: #15803d; border: 1px solid #86efac; }
+        .badge-aftermarket { background: #e0f2fe; color: #0369a1; border: 1px solid #7dd3fc; }
+        .badge-stock { background: #ecfdf5; color: #047857; }
+        .badge-shelf { background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; font-family: monospace; }
+
+        /* Buttons */
+        .btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 8px 16px; font-size: 0.9rem; font-weight: 600; border-radius: 6px; border: none; cursor: pointer; text-decoration: none; transition: all 0.2s; }
+        .btn-primary { background: var(--accent-blue); color: white; }
+        .btn-primary:hover { background: #02659d; }
+        .btn-success { background: var(--accent-green); color: white; }
+        .btn-success:hover { background: #059669; }
+        .btn-outline { background: transparent; border: 1px solid var(--border-color); color: var(--text-dark); }
+        .btn-outline:hover { background: #f1f5f9; }
+        .btn-sm { padding: 4px 10px; font-size: 0.8rem; }
+
+        /* Footer */
+        footer { background: var(--bg-dark); color: #94a3b8; padding: 40px 20px 20px; margin-top: 60px; font-size: 0.9rem; }
+        .footer-container { max-width: 1300px; margin: 0 auto; display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 30px; margin-bottom: 30px; }
+        .footer-col h4 { font-family: 'Outfit', sans-serif; color: white; margin-bottom: 14px; font-size: 1.1rem; }
+        .footer-col ul { list-style: none; }
+        .footer-col li { margin-bottom: 8px; }
+        .footer-col a { color: #94a3b8; text-decoration: none; }
+        .footer-col a:hover { color: var(--accent-light); }
+        .footer-bottom { max-width: 1300px; margin: 0 auto; border-top: 1px solid rgba(255,255,255,0.08); padding-top: 20px; text-align: center; font-size: 0.8rem; color: #64748b; }
     </style>
+    {% block extra_head %}{% endblock %}
 </head>
 <body>
+
+    <!-- Top Bar -->
+    <div class="top-bar">
+        <div>
+            <i class="fa-solid fa-shop me-1"></i>
+            <span data-en="FETAN SPARE PARTS | Official Genuine & OEM Auto Parts Catalog" data-am="ፈጣን የስፔር ፓርቶች | ትክክለኛ የኦሪጂናል አውቶሞቢል ስፔር ፓርቶች ካታሎግ">FETAN SPARE PARTS | Official Genuine & OEM Auto Parts Catalog</span>
+        </div>
+        <div style="display: flex; align-items: center; gap: 15px;">
+            <div>
+                <i class="fa-solid fa-location-dot me-1"></i> Teklehaymanot Addis Hope Building House number G22 | 
+                <a href="{% url 'store:about_us' %}" style="color: var(--accent-light); margin-left: 6px;">
+                    <i class="fa-solid fa-circle-info"></i> <span data-en="About Us" data-am="ስለ እኛ">About Us</span>
+                </a>
+            </div>
+            <!-- Language Switcher -->
+            <div class="lang-switch-box" style="display: flex; background: rgba(255,255,255,0.12); border-radius: 4px; padding: 2px;">
+                <button type="button" class="lang-btn active" id="btnLangEn" onclick="switchLanguage('en')" style="background: var(--accent-blue); color: white; border: none; padding: 2px 8px; font-size: 0.75rem; border-radius: 3px; cursor: pointer; font-weight: 700;">🇬🇧 English</button>
+                <button type="button" class="lang-btn" id="btnLangAm" onclick="switchLanguage('am')" style="background: transparent; color: #cbd5e1; border: none; padding: 2px 8px; font-size: 0.75rem; border-radius: 3px; cursor: pointer; font-weight: 700;">🇪🇹 አማርኛ</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Header -->
     <header>
-        <h1>Spare Parts Shop</h1>
+        <div class="header-container">
+            <a href="{% url 'store:partsouq_catalog' %}" class="brand-logo">
+                <div class="brand-icon"><i class="fa-solid fa-car-rear"></i></div>
+                <div class="brand-text">
+                    <h1>FETAN SPARE PARTS</h1>
+                    <span data-en="Genuine OEM Auto Parts & Catalog" data-am="ኦሪጂናል የመኪና ስፔር ፓርቶች ካታሎግ">Genuine OEM Auto Parts & Catalog</span>
+                </div>
+            </a>
+
+            <!-- Header Quick Search Box -->
+            <div class="header-search">
+                <div class="search-form-tabs">
+                    <button type="button" class="tab-btn active" id="tabVinBtn" onclick="switchSearchTab('vin')">
+                        <i class="fa-solid fa-barcode"></i> <span data-en="VIN / Frame Lookup" data-am="ቪአይኤን / የቻሲስ ፍለጋ">VIN / Frame Lookup</span>
+                    </button>
+                    <button type="button" class="tab-btn" id="tabPartBtn" onclick="switchSearchTab('part')">
+                        <i class="fa-solid fa-magnifying-glass"></i> <span data-en="OEM Part # Search" data-am="የኦሪጂናል ፓርት ቁጥር ፍለጋ">OEM Part # Search</span>
+                    </button>
+                </div>
+                
+                <form action="{% url 'store:vin_lookup' %}" method="get" id="headerVinForm" class="search-input-group">
+                    <input type="text" name="vin" placeholder="Enter VIN or Chassis Frame Code (e.g. VZN130, JTEBU25J...)" data-en="Enter VIN or Chassis Frame Code (e.g. VZN130, JTEBU25J...)" data-am="የቪአይኤን ወይም የቻሲስ ኮድ ያስገቡ (ምሳሌ፡ VZN130, JTEBU25J...)" required>
+                    <button type="submit"><i class="fa-solid fa-circle-arrow-right"></i> <span data-en="Decode VIN" data-am="ቪአይኤን ይረዱ">Decode VIN</span></button>
+                </form>
+
+                <form action="{% url 'store:oem_search' %}" method="get" id="headerPartForm" class="search-input-group" style="display: none;">
+                    <input type="text" name="q" placeholder="Enter OEM Part Number or Name (e.g. 90915-YZZD1, Brake Pads)..." data-en="Enter OEM Part Number or Name (e.g. 90915-YZZD1, Brake Pads)..." data-am="የኦሪጂናል ፓርት ቁጥር ወይም ስም ያስገቡ (ምሳሌ፡ 90915-YZZD1, የፍሬን ጫማ)..." required>
+                    <button type="submit"><i class="fa-solid fa-magnifying-glass"></i> <span data-en="Search OEM" data-am="ፓርት ፈልግ">Search OEM</span></button>
+                </form>
+            </div>
+
+            <!-- Cart & Actions -->
+            <div class="header-actions">
+                <a href="{% url 'store:cart' %}" class="header-btn">
+                    <i class="fa-solid fa-cart-shopping"></i>
+                    <span data-en="Cart" data-am="ቅርጫት">Cart</span>
+                    <span class="cart-badge">{{ cart_count|default:0 }}</span>
+                </a>
+            </div>
+        </div>
     </header>
-    <nav>
-        <a href="{% url 'store:product_list' %}">Home</a>
-        <a href="{% url 'store:cart' %}">Cart ({{ cart_count|default:0 }})</a>
+
+    <!-- Secondary Navbar -->
+    <nav class="nav-bar">
+        <div class="nav-container">
+            <a href="{% url 'store:partsouq_catalog' %}" class="nav-link {% if request.resolver_match.url_name == 'partsouq_catalog' %}active{% endif %}">
+                <i class="fa-solid fa-house"></i> <span data-en="Catalog Home" data-am="የካታሎግ መነሻ">Catalog Home</span>
+            </a>
+            <a href="{% url 'store:vin_lookup' %}" class="nav-link {% if request.resolver_match.url_name == 'vin_lookup' %}active{% endif %}">
+                <i class="fa-solid fa-id-card"></i> <span data-en="VIN Decoder" data-am="ቪአይኤን ዲኮደር">VIN Decoder</span>
+            </a>
+            <a href="{% url 'store:oem_search' %}" class="nav-link {% if request.resolver_match.url_name == 'oem_search' %}active{% endif %}">
+                <i class="fa-solid fa-list-check"></i> <span data-en="Parts List" data-am="የፓርቶች ዝርዝር">Parts List</span>
+            </a>
+            <a href="{% url 'store:about_us' %}" class="nav-link {% if request.resolver_match.url_name == 'about_us' %}active{% endif %}">
+                <i class="fa-solid fa-circle-info"></i> <span data-en="About Us" data-am="ስለ እኛ">About Us</span>
+            </a>
+        </div>
     </nav>
+
+    <!-- Main Container -->
     <main>
+        {% if messages %}
+        <div class="messages-container">
+            {% for message in messages %}
+            <div class="alert alert-{{ message.tags }}">
+                <span><i class="fa-solid fa-circle-info me-2"></i> {{ message }}</span>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+
         {% block content %}{% endblock %}
     </main>
+
+    <!-- Footer -->
+    <footer>
+        <div class="footer-container">
+            <div class="footer-col">
+                <h4><i class="fa-solid fa-car-rear text-accent"></i> FETAN SPARE PARTS</h4>
+                <p style="font-size: 0.85rem; line-height: 1.6; color: #94a3b8;">
+                    Teklehaymanot Addis Hope Building House number G22<br>
+                    Addis Ababa, Ethiopia<br>
+                    <span data-en="Genuine OEM auto spare parts, fast VIN decoding, and exploded assembly schematics." data-am="ትክክለኛ የኦሪጂናል አውቶሞቢል ስፔር ፓርቶች፣ ፈጣን የቪአይኤን ዲኮደር እና የመኪና አሰምብሊ ፓርቶች።">Genuine OEM auto spare parts, fast VIN decoding, and exploded assembly schematics.</span>
+                </p>
+            </div>
+            <div class="footer-col">
+                <h4 data-en="Quick Navigation" data-am="ፈጣን ማውጫ">Quick Navigation</h4>
+                <ul>
+                    <li><a href="{% url 'store:partsouq_catalog' %}" data-en="Vehicle Catalog" data-am="የመኪና ካታሎግ">Vehicle Catalog</a></li>
+                    <li><a href="{% url 'store:vin_lookup' %}" data-en="VIN / Frame Lookup" data-am="ቪአይኤን / የቻሲስ ፍለጋ">VIN / Frame Lookup</a></li>
+                    <li><a href="{% url 'store:oem_search' %}" data-en="OEM Part Search" data-am="የኦሪጂናል ፓርት ፍለጋ">OEM Part Search</a></li>
+                    <li><a href="{% url 'store:cart' %}" data-en="My Shopping Cart" data-am="የእኔ የገበያ ቅርጫት">My Shopping Cart</a></li>
+                </ul>
+            </div>
+            <div class="footer-col">
+                <h4 data-en="Information & Support" data-am="መረጃ እና እርዳታ">Information & Support</h4>
+                <ul>
+                    <li><a href="{% url 'store:about_us' %}" data-en="About Us & Location" data-am="ስለ እኛ እና አድራሻችን">About Us & Location</a></li>
+                    <li><a href="{% url 'store:vin_lookup' %}" data-en="Help with VIN Lookup" data-am="የቪአይኤን ፍለጋ እርዳታ">Help with VIN Lookup</a></li>
+                    <li><a href="{% url 'store:cart' %}" data-en="Order Status" data-am="የትዕዛዝ ሁኔታ">Order Status</a></li>
+                </ul>
+            </div>
+        </div>
+        <div class="footer-bottom">
+            &copy; 2026 FETAN SPARE PARTS — Teklehaymanot Addis Hope Building House number G22. Built for Automotive Excellence.
+        </div>
+    </footer>
+
+    <script>
+        function switchSearchTab(tab) {
+            const vinForm = document.getElementById('headerVinForm');
+            const partForm = document.getElementById('headerPartForm');
+            const tabVinBtn = document.getElementById('tabVinBtn');
+            const tabPartBtn = document.getElementById('tabPartBtn');
+
+            if (tab === 'vin') {
+                vinForm.style.display = 'flex';
+                partForm.style.display = 'none';
+                tabVinBtn.classList.add('active');
+                tabPartBtn.classList.remove('active');
+            } else {
+                vinForm.style.display = 'none';
+                partForm.style.display = 'flex';
+                tabPartBtn.classList.add('active');
+                tabVinBtn.classList.remove('active');
+            }
+        }
+
+        function switchLanguage(lang) {
+            localStorage.setItem('fetan_lang', lang);
+            document.querySelectorAll('[data-en]').forEach(el => {
+                const text = el.getAttribute('data-' + lang);
+                if (text) {
+                    if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA') {
+                        el.placeholder = text;
+                    } else {
+                        el.innerText = text;
+                    }
+                }
+            });
+            const btnEn = document.getElementById('btnLangEn');
+            const btnAm = document.getElementById('btnLangAm');
+            if (btnEn && btnAm) {
+                if (lang === 'am') {
+                    btnEn.style.background = 'transparent';
+                    btnEn.style.color = '#cbd5e1';
+                    btnAm.style.background = 'var(--accent-blue)';
+                    btnAm.style.color = 'white';
+                } else {
+                    btnAm.style.background = 'transparent';
+                    btnAm.style.color = '#cbd5e1';
+                    btnEn.style.background = 'var(--accent-blue)';
+                    btnEn.style.color = 'white';
+                }
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            const savedLang = localStorage.getItem('fetan_lang') || 'en';
+            if (savedLang === 'am') {
+                switchLanguage('am');
+            }
+        });
+    </script>
+    {% block extra_js %}{% endblock %}
 </body>
 </html>

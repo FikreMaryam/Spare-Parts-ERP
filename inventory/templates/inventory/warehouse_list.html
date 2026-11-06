@@ -1,52 +1,162 @@
 {% extends "base.html" %}
 
-{% block title %}Warehouses - Spare ERP{% endblock %}
+{% block title %}Multi-Shop & Warehouse Network (የመደብሮችና መጋዘኖች አውታር) - {{ app_name }}{% endblock %}
 
-{% block page_title %}Warehouses{% endblock %}
+{% block page_title %}Multi-Shop & Warehouse Network (መደብሮችና መጋዘኖች){% endblock %}
 
 {% block content %}
-<div style="display: flex; justify-content: flex-end; margin-bottom: 2rem;">
-    {% if request.user.is_superuser %}
-    <a href="{% url 'warehouse_create' %}" class="btn">Add New Warehouse</a>
-    {% endif %}
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 1rem;">
+    <div>
+        <p style="margin: 0; color: hsl(var(--text-muted)); font-size: 0.95rem;">
+            Track inventory, stock values, and parts across multiple storefront shops and central warehouses.
+        </p>
+    </div>
+    <div style="display: flex; gap: 0.6rem; align-items: center; flex-wrap: wrap;">
+        <a href="{% url 'transfer_stock' %}" class="btn btn-secondary" style="font-weight: 700; display: inline-flex; align-items: center; gap: 0.4rem;">
+            🔄 Transfer Parts Between Shops (ዕቃ ማስተላለፍ)
+        </a>
+        <a href="{% url 'import_shipments_list' %}" class="btn btn-secondary" style="font-weight: 700; display: inline-flex; align-items: center; gap: 0.4rem;">
+            🚢 Import Materials & Landed Cost
+        </a>
+        {% if request.user.is_superuser %}
+        <a href="{% url 'warehouse_create' %}" class="btn" style="background: #0f766e; color: #ffffff; font-weight: 700;">
+            ➕ Add New Shop / Warehouse
+        </a>
+        {% endif %}
+    </div>
 </div>
 
-<div class="card" style="padding: 0; overflow: hidden;">
-    <div style="padding: 1.5rem 2rem; border-bottom: 1px solid hsl(var(--border)); background: hsla(var(--bg-hover) / 0.3);">
-        <span style="font-size: 0.9rem; color: hsl(var(--text-muted));">Manage your physical storage locations</span>
+<!-- Shops & Warehouses Cards Grid -->
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 1.25rem; margin-bottom: 2rem;">
+    {% for w in warehouses %}
+    <div class="card" style="border: 2px solid {% if selected_warehouse.id == w.id %}#0f766e{% else %}hsl(var(--border)){% endif %}; position: relative; display: flex; flex-direction: column; justify-content: space-between;">
+        <div>
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.75rem;">
+                <div>
+                    <span class="badge" style="background: {% if w.branch_type == 'RETAIL_SHOP' %}#dbeafe; color: #1e40af;{% elif w.branch_type == 'WAREHOUSE' %}#fef3c7; color: #92400e;{% else %}#f1f5f9; color: #475569;{% endif %} font-size: 0.75rem; font-weight: 700;">
+                        {{ w.get_branch_type_display }}
+                    </span>
+                    <h3 style="margin: 0.4rem 0 0.2rem 0; font-size: 1.15rem; font-weight: 800; color: hsl(var(--text));">
+                        {{ w.name }}
+                    </h3>
+                    {% if w.code %}<span style="font-size: 0.78rem; font-family: monospace; color: hsl(var(--text-muted)); font-weight: 700;">Code: {{ w.code }}</span>{% endif %}
+                </div>
+                <div style="text-align: right;">
+                    <span class="badge badge-ok" style="font-size: 0.75rem;">Active</span>
+                </div>
+            </div>
+
+            <p style="font-size: 0.85rem; color: hsl(var(--text-muted)); margin: 0.4rem 0;">
+                📍 {{ w.location|default:"Addis Ababa, Ethiopia" }}
+            </p>
+            {% if w.phone %}
+            <p style="font-size: 0.85rem; color: hsl(var(--text-muted)); margin: 0.2rem 0;">
+                📞 {{ w.phone }}
+            </p>
+            {% endif %}
+
+            <!-- Mini Branch KPIs -->
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; background: hsla(var(--bg-hover) / 0.5); padding: 0.85rem; border-radius: 8px; margin-top: 1rem; border: 1px solid hsl(var(--border));">
+                <div>
+                    <div style="font-size: 0.75rem; text-transform: uppercase; color: hsl(var(--text-muted)); font-weight: 700;">Parts Stored</div>
+                    <div style="font-size: 1.25rem; font-weight: 800; color: hsl(var(--text)); font-family: monospace;">
+                        {{ w.total_products_count }} <span style="font-size: 0.75rem; font-weight: normal; color: hsl(var(--text-muted));">items</span>
+                    </div>
+                </div>
+                <div>
+                    <div style="font-size: 0.75rem; text-transform: uppercase; color: hsl(var(--text-muted)); font-weight: 700;">Stock Valuation</div>
+                    <div style="font-size: 1.15rem; font-weight: 800; color: #0f766e; font-family: monospace;">
+                        {{ w.total_stock_value|floatformat:2 }} <span style="font-size: 0.75rem; font-weight: normal; color: hsl(var(--text-muted));">ETB</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 1.25rem; padding-top: 0.85rem; border-top: 1px solid hsl(var(--border));">
+            <a href="?wh={{ w.id }}" class="btn {% if selected_warehouse.id == w.id %}btn-primary{% else %}btn-secondary{% endif %} btn-sm" style="font-weight: 700;">
+                📦 View Parts in This Store
+            </a>
+            <div>
+                {% if request.user.is_superuser %}
+                <a href="{% url 'warehouse_update' w.pk %}" class="btn btn-secondary btn-sm" style="padding: 0.35rem 0.65rem;">Edit</a>
+                <a href="{% url 'warehouse_delete' w.pk %}" class="btn btn-danger btn-sm" style="padding: 0.35rem 0.65rem; margin-left: 0.3rem;">Delete</a>
+                {% endif %}
+            </div>
+        </div>
     </div>
-    <table class="sortable-table">
-        <thead>
-            <tr>
-                <th style="padding-left: 2rem;">Name</th>
-                <th>Location</th>
-                <th>Description</th>
-                {% if request.user.is_superuser %}
-                <th style="text-align: right; padding-right: 2rem;">Actions</th>
-                {% endif %}
-            </tr>
-        </thead>
-        <tbody>
-            {% for w in warehouses %}
-            <tr>
-                <td style="padding-left: 2rem; font-weight: 600; color: hsl(var(--text));">{{ w.name }}</td>
-                <td>{{ w.location|default:"—" }}</td>
-                <td><span style="font-size: 0.9rem; color: hsl(var(--text-muted));">{{ w.description|truncatechars:100|default:"—" }}</span></td>
-                {% if request.user.is_superuser %}
-                <td style="text-align: right; padding-right: 2rem; white-space: nowrap;">
-                    <a href="{% url 'warehouse_update' w.pk %}" class="btn btn-secondary" style="padding: 0.4rem 0.8rem; font-size: 0.85rem;">Edit</a>
-                    <a href="{% url 'warehouse_delete' w.pk %}" class="btn btn-danger" style="padding: 0.4rem 0.8rem; font-size: 0.85rem; margin-left: 0.5rem;">Delete</a>
-                </td>
-                {% endif %}
-            </tr>
-            {% empty %}
-            <tr>
-                <td colspan="4" style="text-align: center; padding: 4rem; color: hsl(var(--text-muted));">
-                    No warehouses defined. <a href="{% url 'warehouse_create' %}" style="color: hsl(var(--accent)); font-weight: 600;">Add one</a>.
-                </td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
+    {% empty %}
+    <div class="card" style="grid-column: 1 / -1; text-align: center; padding: 3rem;">
+        <p>No shops or warehouses found.</p>
+        <a href="{% url 'warehouse_create' %}" class="btn btn-primary">➕ Add First Shop / Store</a>
+    </div>
+    {% endfor %}
 </div>
+
+<!-- Specific Store Parts Inventory Breakdown -->
+{% if selected_warehouse %}
+<div class="card" style="padding: 0; overflow: hidden; margin-top: 2rem;">
+    <div style="padding: 1.25rem 1.5rem; background: hsla(var(--bg-hover) / 0.5); border-bottom: 1px solid hsl(var(--border)); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem;">
+        <div>
+            <h3 style="margin: 0; font-size: 1.1rem; font-weight: 800; color: hsl(var(--text)); display: flex; align-items: center; gap: 0.5rem;">
+                <span>📦</span> Current Parts Stock at: {{ selected_warehouse.name }}
+            </h3>
+            <span style="font-size: 0.82rem; color: hsl(var(--text-muted));">{{ branch_stocks.count }} unique parts currently stocked in this store</span>
+        </div>
+        <div style="display: flex; gap: 0.5rem;">
+            <a href="{% url 'transfer_stock' %}?source={{ selected_warehouse.id }}" class="btn btn-secondary btn-sm" style="font-weight: 700;">
+                🔄 Transfer Parts Out of Here
+            </a>
+            <a href="{% url 'warehouse_list' %}" class="btn btn-secondary btn-sm">Close Store View</a>
+        </div>
+    </div>
+
+    <div class="table-container">
+        <table class="sortable-table">
+            <thead>
+                <tr>
+                    <th style="padding-left: 1.5rem;">Part # / OEM</th>
+                    <th>Part Name & Description</th>
+                    <th>Category</th>
+                    <th>Shelf / Bin Location</th>
+                    <th style="text-align: center;">Stock Qty</th>
+                    <th style="text-align: right;">Unit Cost (ETB)</th>
+                    <th style="text-align: right; padding-right: 1.5rem;">Total Value (ETB)</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for bs in branch_stocks %}
+                <tr>
+                    <td style="padding-left: 1.5rem; font-family: monospace; font-weight: 700;">
+                        <a href="{% url 'product_detail' bs.product.id %}" style="color: inherit; text-decoration: none;">
+                            {{ bs.product.part_number|default:"—" }}
+                        </a>
+                    </td>
+                    <td>
+                        <strong>{{ bs.product.name }}</strong>
+                        {% if bs.product.brand %}<span style="font-size: 0.8rem; color: hsl(var(--text-muted));">({{ bs.product.brand }})</span>{% endif %}
+                    </td>
+                    <td style="color: hsl(var(--text-muted));">{{ bs.product.category.name|default:"—" }}</td>
+                    <td style="font-family: monospace; font-size: 0.85rem;">{{ bs.shelf_bin|default:bs.product.shelf_bin|default:"—" }}</td>
+                    <td style="text-align: center; font-weight: 800; font-size: 1rem; color: #0f766e;">
+                        {{ bs.quantity }} <span style="font-size: 0.78rem; font-weight: normal; color: hsl(var(--text-muted));">{{ bs.product.uom_short }}</span>
+                    </td>
+                    <td style="text-align: right; font-family: monospace;">{{ bs.product.cost_price|floatformat:2 }}</td>
+                    <td style="text-align: right; padding-right: 1.5rem; font-weight: 800; font-family: monospace; color: hsl(var(--text));">
+                        {{ bs.quantity|floatformat:2 }} ETB
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="7" style="text-align: center; padding: 3rem; color: hsl(var(--text-muted));">
+                        No parts currently recorded in {{ selected_warehouse.name }}.
+                        <a href="{% url 'transfer_stock' %}?dest={{ selected_warehouse.id }}" style="color: #0f766e; font-weight: 700; margin-left: 0.5rem;">Transfer parts here</a>.
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endif %}
+
 {% endblock %}

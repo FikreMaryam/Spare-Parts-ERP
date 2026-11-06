@@ -1,97 +1,408 @@
 {% extends "base.html" %}
 
-{% block title %}Product Detail - {{ product.name }} - Spare ERP{% endblock %}
+{% block title %}{{ product.name }} ({{ product.part_number|default:product.sku }}) - Product Details - {{ app_name }}{% endblock %}
 
-{% block page_title %}Product Details{% endblock %}
+{% block page_title %}Spare Part Details{% endblock %}
+
+{% block extra_css %}
+<style>
+.fit-box-card {
+    background: linear-gradient(135deg, hsla(var(--bg-hover) / 0.5) 0%, hsla(var(--card) / 0.9) 100%);
+    border: 1px solid hsl(var(--border));
+    border-radius: 12px;
+    padding: 1.5rem;
+    margin-bottom: 2rem;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+}
+.fit-badge-card {
+    padding: 1.25rem;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-top: 1rem;
+}
+.fit-badge-card.exact-fit {
+    background: #ecfdf5;
+    border: 2px solid #10b981;
+    color: #065f46;
+}
+.fit-badge-card.substitute-fit {
+    background: #eff6ff;
+    border: 2px solid #3b82f6;
+    color: #1e40af;
+}
+.fit-badge-card.no-fit {
+    background: #fef2f2;
+    border: 2px solid #ef4444;
+    color: #991b1b;
+}
+.fit-badge-card.neutral-fit {
+    background: hsla(var(--bg-hover) / 0.6);
+    border: 1px dashed hsl(var(--border));
+    color: hsl(var(--text-muted));
+}
+.barcode-box {
+    display: inline-block;
+    background: #ffffff;
+    color: #000000;
+    padding: 0.75rem 1.25rem;
+    border-radius: 6px;
+    border: 1px solid #e5e7eb;
+    text-align: center;
+    font-family: monospace;
+}
+.barcode-stripes {
+    letter-spacing: 2px;
+    font-size: 1.4rem;
+    line-height: 1;
+    user-select: none;
+    font-weight: 900;
+}
+</style>
+{% endblock %}
 
 {% block content %}
-<div style="display: flex; justify-content: flex-end; margin-bottom: 2rem;">
-    {% if request.user.is_superuser %}
-    <a href="{% url 'product_update' product.id %}" class="btn">Edit Product</a>
-    <a href="{% url 'product_delete' product.id %}" class="btn btn-danger" style="margin-left: 0.75rem;">Delete</a>
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 1rem;">
+    <div style="display: flex; gap: 0.5rem; align-items: center;">
+        <a href="{% url 'product_list' %}" class="btn btn-secondary btn-sm">← Back to Catalog</a>
+        <a href="{% url 'pos' %}?q={{ product.part_number|default:product.sku }}" class="btn btn-sm" style="background: hsl(var(--accent)); color: white;">🛒 Open in POS</a>
+    </div>
+    <div style="display: flex; gap: 0.5rem;">
+        <a href="{% url 'add_to_cart' product.id %}" class="btn btn-primary btn-sm">+ Add to Cart ({{ product.uom_short }})</a>
+        {% if request.user.is_superuser or request.user.is_staff %}
+        <a href="{% url 'product_update' product.id %}" class="btn btn-secondary btn-sm">Edit</a>
+        <a href="{% url 'product_delete' product.id %}" class="btn btn-danger btn-sm">Delete</a>
+        {% endif %}
+    </div>
+</div>
+
+<!-- ================= 1. LIVE VEHICLE FITMENT VERIFICATION WIDGET ================= -->
+<div class="fit-box-card">
+    <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid hsl(var(--border)); padding-bottom: 0.75rem; margin-bottom: 1.25rem;">
+        <h3 style="margin: 0; font-size: 1.15rem; display: flex; align-items: center; gap: 0.5rem;">
+            <span>🚗</span> Live Vehicle Fitment Verification / የተሽከርካሪ ተስማሚነት ማረጋገጫ
+        </h3>
+        <span style="font-size: 0.85rem; color: hsl(var(--text-muted));">Enter 17-char VIN, Chassis Code, or choose Car Model</span>
+    </div>
+
+    <form method="get" id="fitment-verify-form" style="display: flex; flex-wrap: wrap; gap: 1rem; align-items: flex-end;">
+        <div style="flex: 2; min-width: 250px;">
+            <label style="font-size: 0.85rem; font-weight: 600; display: block; margin-bottom: 0.35rem;">
+                VIN / Chassis Number (ቪን ወይም የሻንሲ ቁጥር)
+            </label>
+            <input type="text" name="vin" id="vin-input" placeholder="e.g. JTDKN3DU..., NZE141, KUN25, GUN125" value="{{ vin_query }}" class="form-input" style="font-family: monospace; font-weight: 700; text-transform: uppercase;">
+        </div>
+
+        <div style="flex: 1.5; min-width: 200px;">
+            <label style="font-size: 0.85rem; font-weight: 600; display: block; margin-bottom: 0.35rem;">
+                Or Select Car Make & Model
+            </label>
+            <select name="carmodel" id="carmodel-select" class="form-input">
+                <option value="">-- Choose Car Model --</option>
+                {% for m in car_makes %}
+                    <optgroup label="{{ m.name }}">
+                        {% for mod in m.models.all %}
+                        <option value="{{ mod.id }}" {% if carmodel_id == mod.id %}selected{% endif %}>
+                            {{ m.name }} {{ mod.name }} ({{ mod.year_from|default:'' }}–{{ mod.year_to|default:'Present' }})
+                        </option>
+                        {% endfor %}
+                    </optgroup>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div style="display: flex; gap: 0.5rem;">
+            <button type="submit" class="btn btn-primary" style="font-weight: 700;">
+                🔍 Verify Fitment
+            </button>
+            {% if vin_query or carmodel_id %}
+            <a href="{% url 'product_detail' product.id %}" class="btn btn-secondary">Reset</a>
+            {% endif %}
+        </div>
+    </form>
+
+    <!-- Fitment Status Result Card -->
+    {% if fitment_result.status == "EXACT_FIT" or fitment_result.status == "APPLICATION_MATCH" %}
+    <div class="fit-badge-card exact-fit">
+        <div style="font-size: 2.2rem; line-height: 1;">✅</div>
+        <div>
+            <div style="font-size: 1.15rem; font-weight: 800; letter-spacing: 0.02em;">
+                {{ fitment_result.badge_text }}
+            </div>
+            <div style="font-size: 0.95rem; font-weight: 600; margin-top: 0.2rem;">
+                Matches: {{ fitment_result.matched_vehicle }}
+            </div>
+            <div style="font-size: 0.85rem; opacity: 0.9; margin-top: 0.2rem;">
+                {{ fitment_result.detail }}
+            </div>
+        </div>
+    </div>
+    {% elif fitment_result.status == "SUBSTITUTE_FIT" %}
+    <div class="fit-badge-card substitute-fit">
+        <div style="font-size: 2.2rem; line-height: 1;">🔄</div>
+        <div>
+            <div style="font-size: 1.15rem; font-weight: 800;">
+                {{ fitment_result.badge_text }}
+            </div>
+            <div style="font-size: 0.95rem; font-weight: 600; margin-top: 0.2rem;">
+                Vehicle: {{ fitment_result.matched_vehicle }}
+            </div>
+            <div style="font-size: 0.85rem; opacity: 0.9; margin-top: 0.2rem;">
+                {{ fitment_result.detail }}
+                {% if fitment_result.substitute_part_id %}
+                <a href="{% url 'product_detail' fitment_result.substitute_part_id %}" style="color: inherit; text-decoration: underline; font-weight: 700; margin-left: 0.5rem;">View Substitute Part →</a>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    {% elif fitment_result.status == "NO_FIT" %}
+    <div class="fit-badge-card no-fit">
+        <div style="font-size: 2.2rem; line-height: 1;">⚠️</div>
+        <div>
+            <div style="font-size: 1.15rem; font-weight: 800;">
+                {{ fitment_result.badge_text }}
+            </div>
+            <div style="font-size: 0.95rem; font-weight: 600; margin-top: 0.2rem;">
+                Checked for: {{ fitment_result.matched_vehicle }}
+            </div>
+            <div style="font-size: 0.85rem; opacity: 0.9; margin-top: 0.2rem;">
+                {{ fitment_result.detail }} Double check the chassis prefix or consult parts manual.
+            </div>
+        </div>
+    </div>
+    {% else %}
+    <div class="fit-badge-card neutral-fit">
+        <div style="font-size: 1.8rem; line-height: 1;">🚗</div>
+        <div>
+            <div style="font-weight: 700; font-size: 0.95rem; color: hsl(var(--text));">Instant Fitment Verification Ready</div>
+            <div style="font-size: 0.85rem;">Paste a 17-character VIN or Ethiopian chassis prefix (e.g. <code>JTDKN...</code> or <code>KUN25</code>) to confirm guaranteed vehicle fit.</div>
+        </div>
+    </div>
     {% endif %}
 </div>
 
-<div class="row" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 2rem;">
-    <!-- Core Info -->
+<!-- ================= 2. CORE PART INFO & INVENTORY/PRICING ================= -->
+<div class="row" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(380px, 1fr)); gap: 1.5rem; margin-bottom: 2rem;">
+    <!-- General Information -->
     <div class="card" style="padding: 0; overflow: hidden;">
-        <div style="padding: 1.5rem 2rem; border-bottom: 1px solid hsl(var(--border)); background: hsla(var(--bg-hover) / 0.3);">
-            <h2 style="margin: 0; font-size: 1.25rem;">General Information</h2>
+        <div style="padding: 1.25rem 1.75rem; border-bottom: 1px solid hsl(var(--border)); background: hsla(var(--bg-hover) / 0.4); display: flex; justify-content: space-between; align-items: center;">
+            <h2 style="margin: 0; font-size: 1.15rem;">Part Identification</h2>
+            {% if product.is_genuine %}
+            <span style="background: #ecfdf5; color: #059669; border: 1px solid #10b981; padding: 0.25rem 0.65rem; border-radius: 20px; font-size: 0.75rem; font-weight: 700;">
+                ✓ Genuine OEM
+            </span>
+            {% else %}
+            <span style="background: #fef3c7; color: #d97706; border: 1px solid #f59e0b; padding: 0.25rem 0.65rem; border-radius: 20px; font-size: 0.75rem; font-weight: 700;">
+                Aftermarket Brand
+            </span>
+            {% endif %}
         </div>
-        <div style="padding: 2rem;">
-            <div style="display: grid; gap: 1.5rem;">
-                <div style="display: flex; justify-content: space-between; align-items: center;">
-                    <span style="color: hsl(var(--text-muted)); font-weight: 500;">Part Number</span>
-                    <span style="font-weight: 700; color: hsl(var(--text)); font-family: monospace; font-size: 1.1rem;">{{ product.part_number|default:"—" }}</span>
+        <div style="padding: 1.75rem;">
+            {% if product.image %}
+            <div style="text-align: center; margin-bottom: 1.25rem;">
+                <img src="{{ product.image.url }}" alt="{{ product.name }}" style="max-width: 170px; max-height: 170px; object-fit: contain; border-radius: 10px; border: 1px solid hsl(var(--border)); padding: 0.5rem; background: hsl(var(--bg-hover));">
+            </div>
+            {% else %}
+            <div style="text-align: center; margin-bottom: 1.25rem;">
+                <div style="width: 90px; height: 90px; margin: 0 auto; background: hsla(var(--bg-hover) / 0.6); border: 1px solid hsl(var(--border)); border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 2.2rem;">⚙️</div>
+            </div>
+            {% endif %}
+
+            <div style="display: grid; gap: 1rem;">
+                <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px dashed hsl(var(--border)); padding-bottom: 0.5rem;">
+                    <span style="color: hsl(var(--text-muted)); font-weight: 500;">OEM Part Number</span>
+                    <span style="font-weight: 800; color: hsl(var(--text)); font-family: monospace; font-size: 1.1rem; background: hsla(var(--bg-hover) / 0.8); padding: 0.2rem 0.5rem; border-radius: 6px;">{{ product.part_number|default:"—" }}</span>
                 </div>
-                <div style="display: flex; justify-content: space-between; align-items: center;">
-                    <span style="color: hsl(var(--text-muted)); font-weight: 500;">Name</span>
-                    <span style="font-weight: 600; color: hsl(var(--text));">{{ product.name }}</span>
+                <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px dashed hsl(var(--border)); padding-bottom: 0.5rem;">
+                    <span style="color: hsl(var(--text-muted)); font-weight: 500;">SKU Code</span>
+                    <span style="font-weight: 700; font-family: monospace;">{{ product.sku|default:"—" }}</span>
                 </div>
-                <div style="display: flex; justify-content: space-between; align-items: center;">
-                    <span style="color: hsl(var(--text-muted)); font-weight: 500;">Brand</span>
-                    <span style="font-weight: 600; color: hsl(var(--accent));">{{ product.brand|default:"—" }}</span>
+                <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px dashed hsl(var(--border)); padding-bottom: 0.5rem;">
+                    <span style="color: hsl(var(--text-muted)); font-weight: 500;">Part Name</span>
+                    <span style="font-weight: 700; color: hsl(var(--text));">{{ product.name }}</span>
                 </div>
-                <div style="display: flex; justify-content: space-between; align-items: center;">
+                <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px dashed hsl(var(--border)); padding-bottom: 0.5rem;">
+                    <span style="color: hsl(var(--text-muted)); font-weight: 500;">Brand / Manufacturer</span>
+                    <span style="font-weight: 700; color: hsl(var(--accent));">{{ product.manufacturer_brand|default:product.brand|default:"—" }}</span>
+                </div>
+                <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px dashed hsl(var(--border)); padding-bottom: 0.5rem;">
                     <span style="color: hsl(var(--text-muted)); font-weight: 500;">Category</span>
-                    <span style="background: hsla(var(--accent) / 0.1); color: hsl(var(--accent)); padding: 0.3rem 0.75rem; border-radius: 20px; font-size: 0.85rem; font-weight: 600;">{{ product.category.name|default:"—" }}</span>
+                    <span style="background: hsla(var(--accent) / 0.1); color: hsl(var(--accent)); padding: 0.25rem 0.6rem; border-radius: 6px; font-size: 0.82rem; font-weight: 600;">{{ product.category.name|default:"General Parts" }}</span>
+                </div>
+                <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px dashed hsl(var(--border)); padding-bottom: 0.5rem;">
+                    <span style="color: hsl(var(--text-muted)); font-weight: 500;">Unit of Measure (UOM)</span>
+                    <span style="font-weight: 700;">{{ product.get_unit_of_measure_display }} ({{ product.uom_amharic }})</span>
                 </div>
                 <div style="display: flex; justify-content: space-between; align-items: center;">
-                    <span style="color: hsl(var(--text-muted)); font-weight: 500;">Location</span>
-                    <span style="font-weight: 600;">{{ product.location|default:"—" }}</span>
+                    <span style="color: hsl(var(--text-muted)); font-weight: 500;">Shelf / Bin Location</span>
+                    <span style="font-weight: 700; font-family: monospace;">📍 {{ product.shelf_bin|default:product.location|default:"Teklehaymanot Main Shop" }}</span>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- Inventory & Pricing -->
+    <!-- Inventory & Pricing in ETB -->
     <div class="card" style="padding: 0; overflow: hidden;">
-        <div style="padding: 1.5rem 2rem; border-bottom: 1px solid hsl(var(--border)); background: hsla(var(--bg-hover) / 0.3);">
-            <h2 style="margin: 0; font-size: 1.25rem;">Inventory & Pricing</h2>
+        <div style="padding: 1.25rem 1.75rem; border-bottom: 1px solid hsl(var(--border)); background: hsla(var(--bg-hover) / 0.4);">
+            <h2 style="margin: 0; font-size: 1.15rem;">Inventory & Financial Value (ETB)</h2>
         </div>
-        <div style="padding: 2rem;">
-            <div style="display: grid; gap: 1.5rem;">
-                <div style="display: flex; justify-content: space-between; align-items: center;">
-                    <span style="color: hsl(var(--text-muted)); font-weight: 500;">Stock Level</span>
+        <div style="padding: 1.75rem;">
+            <div style="display: grid; gap: 1.2rem;">
+                <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px dashed hsl(var(--border)); padding-bottom: 0.6rem;">
+                    <span style="color: hsl(var(--text-muted)); font-weight: 500;">Total Stock On Hand</span>
                     <div>
-                        <span style="font-weight: 700; font-size: 1.25rem; margin-right: 0.5rem;">{{ product.quantity }}</span>
+                        <span style="font-weight: 800; font-size: 1.4rem; margin-right: 0.4rem;">{{ product.quantity }}</span>
+                        <span style="font-size: 0.9rem; color: hsl(var(--text-muted)); font-weight: 600;">{{ product.uom_short }}</span>
                         {% if product.is_low_stock %}
-                        <span style="background: hsla(var(--error) / 0.1); color: hsl(var(--error)); padding: 0.25rem 0.6rem; border-radius: 6px; font-size: 0.75rem; font-weight: 700; text-transform: uppercase;">Low Stock</span>
+                        <span style="background: #fee2e2; color: #b91c1c; padding: 0.2rem 0.5rem; border-radius: 4px; font-size: 0.72rem; font-weight: 800; text-transform: uppercase; margin-left: 0.5rem;">Low Stock</span>
                         {% else %}
-                        <span style="background: hsla(var(--success) / 0.1); color: hsl(var(--success)); padding: 0.25rem 0.6rem; border-radius: 6px; font-size: 0.75rem; font-weight: 700; text-transform: uppercase;">In Stock</span>
+                        <span style="background: #dcfce7; color: #15803d; padding: 0.2rem 0.5rem; border-radius: 4px; font-size: 0.72rem; font-weight: 800; text-transform: uppercase; margin-left: 0.5rem;">Available</span>
                         {% endif %}
                     </div>
                 </div>
-                <div style="display: flex; justify-content: space-between; align-items: center;">
-                    <span style="color: hsl(var(--text-muted)); font-weight: 500;">Cost Price</span>
-                    <span style="font-weight: 600;">${{ product.cost_price|floatformat:2 }}</span>
+
+                <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px dashed hsl(var(--border)); padding-bottom: 0.6rem;">
+                    <span style="color: hsl(var(--text-muted)); font-weight: 500;">Unit Cost Price (Landed)</span>
+                    <span style="font-weight: 700; font-family: monospace; font-size: 1.05rem;">{{ product.cost_price|floatformat:2 }} ETB</span>
                 </div>
-                <div style="display: flex; justify-content: space-between; align-items: center;">
-                    <span style="color: hsl(var(--text-muted)); font-weight: 500;">Retail Price</span>
-                    <span style="font-weight: 700; color: hsl(var(--accent)); font-size: 1.1rem;">${{ product.selling_price|floatformat:2 }}</span>
+
+                <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px dashed hsl(var(--border)); padding-bottom: 0.6rem;">
+                    <span style="color: hsl(var(--text-muted)); font-weight: 500;">Retail Selling Price (Inc. VAT)</span>
+                    <span style="font-weight: 800; color: hsl(var(--accent)); font-family: monospace; font-size: 1.25rem;">{{ product.selling_price|floatformat:2 }} ETB</span>
                 </div>
-                <div style="display: flex; justify-content: space-between; align-items: center;">
-                    <span style="color: hsl(var(--text-muted)); font-weight: 500;">Wholesale Price</span>
-                    <span style="font-weight: 600; color: hsl(var(--success));">${{ product.wholesale_price|floatformat:2 }}</span>
+
+                <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px dashed hsl(var(--border)); padding-bottom: 0.6rem;">
+                    <span style="color: hsl(var(--text-muted)); font-weight: 500;">Wholesale / Garage Price</span>
+                    <span style="font-weight: 700; color: hsl(var(--success)); font-family: monospace; font-size: 1.05rem;">{{ product.wholesale_price|floatformat:2 }} ETB</span>
+                </div>
+
+                <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px dashed hsl(var(--border)); padding-bottom: 0.6rem;">
+                    <span style="color: hsl(var(--text-muted)); font-weight: 500;">Total Stock Value at Cost</span>
+                    <span style="font-weight: 700; font-family: monospace;">{% widthratio product.quantity 1 product.cost_price %} ETB</span>
+                </div>
+
+                <!-- Printable Barcode representation -->
+                <div style="margin-top: 0.5rem; text-align: center; background: hsla(var(--bg-hover) / 0.5); padding: 1rem; border-radius: 8px;">
+                    <div style="font-size: 0.8rem; color: hsl(var(--text-muted)); margin-bottom: 0.4rem; font-weight: 600;">
+                        📷 Barcode Scanner Code
+                    </div>
+                    <div class="barcode-box">
+                        <div class="barcode-stripes">||| | |||| | ||| |||| | || |</div>
+                        <div style="font-size: 0.85rem; font-weight: 700; letter-spacing: 1px; margin-top: 3px;">
+                            {{ product.sku|default:product.part_number }}
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
+</div>
 
-    <!-- Vehicle Applications (Full width) -->
-    <div class="card" style="grid-column: 1 / -1; padding: 2rem;">
-        <h2 style="margin-bottom: 1.5rem; font-size: 1.25rem; border-bottom: 1px solid hsl(var(--border)); padding-bottom: 0.75rem;">Vehicle Compatibility</h2>
-        <div style="display: flex; flex-wrap: wrap; gap: 0.75rem;">
-            {% if product.compatibilities.exists %}
-                {% for cm in product.compatibilities.all %}
-                <span style="background: hsla(var(--bg-hover) / 0.5); border: 1px solid hsl(var(--border)); padding: 0.5rem 1rem; border-radius: 8px; font-size: 0.9rem; font-weight: 500;">
-                    {{ cm }}
+<!-- ================= 3. CROSS-REFERENCE & INTERCHANGEABLE OEM PARTS ================= -->
+<div class="card" style="margin-bottom: 2rem; padding: 1.75rem;">
+    <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid hsl(var(--border)); padding-bottom: 0.75rem; margin-bottom: 1.25rem;">
+        <h2 style="margin: 0; font-size: 1.2rem; display: flex; align-items: center; gap: 0.5rem;">
+            <span>🔄</span> Cross-Reference & OEM Interchange / ተለዋጭ እና ተዛማጅ ቁጥሮች
+        </h2>
+        <span style="font-size: 0.85rem; color: hsl(var(--text-muted));">Alternate codes, supersessions, and equivalent brands</span>
+    </div>
+
+    <!-- Alternate OEM Numbers List -->
+    <div style="margin-bottom: 1.5rem;">
+        <div style="font-weight: 600; font-size: 0.9rem; margin-bottom: 0.5rem; color: hsl(var(--text-muted));">
+            Alternate OEM / Superseded Part Numbers:
+        </div>
+        <div style="display: flex; flex-wrap: wrap; gap: 0.5rem;">
+            {% if cross_refs.alternate_numbers %}
+                {% for alt in cross_refs.alternate_numbers %}
+                <span style="font-family: monospace; font-weight: 700; background: hsla(var(--bg-hover) / 0.8); border: 1px solid hsl(var(--border)); padding: 0.35rem 0.75rem; border-radius: 6px; font-size: 0.9rem; display: inline-flex; align-items: center; gap: 0.4rem;">
+                    <span>🔖</span> {{ alt }}
                 </span>
                 {% endfor %}
             {% else %}
-                <p style="color: hsl(var(--text-muted));">{{ product.vehicle_application|default:"No specific vehicle applications listed." }}</p>
+                <span style="color: hsl(var(--text-muted)); font-size: 0.9rem;">
+                    No alternate numbers configured. You can edit this product to add comma-separated alternate numbers (e.g. <code>04465-YZZE1, 04465-02240</code>).
+                </span>
             {% endif %}
         </div>
     </div>
+
+    <!-- Equivalent Substitutes & Aftermarket Brands -->
+    <div>
+        <div style="font-weight: 600; font-size: 0.9rem; margin-bottom: 0.5rem; color: hsl(var(--text-muted));">
+            Interchangeable Spare Parts & Aftermarket Brands in Inventory:
+        </div>
+        {% if cross_refs.substitutes %}
+        <div class="table-container">
+            <table class="table" style="width: 100%;">
+                <thead>
+                    <tr>
+                        <th>Substitute Part</th>
+                        <th>Type / Brand</th>
+                        <th>OEM #</th>
+                        <th>In Stock</th>
+                        <th>Price (ETB)</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in cross_refs.substitutes %}
+                    <tr>
+                        <td>
+                            <a href="{% url 'product_detail' item.product.id %}" style="font-weight: 700; text-decoration: none;">
+                                {{ item.product.name }}
+                            </a>
+                        </td>
+                        <td>
+                            <span style="font-size: 0.82rem; background: hsla(var(--accent) / 0.1); color: hsl(var(--accent)); padding: 0.2rem 0.5rem; border-radius: 4px; font-weight: 600;">
+                                {{ item.substitute_type }}
+                            </span>
+                        </td>
+                        <td style="font-family: monospace; font-weight: 700;">{{ item.product.part_number|default:"—" }}</td>
+                        <td>
+                            <span style="font-weight: 700;">{{ item.product.quantity }} {{ item.product.uom_short }}</span>
+                        </td>
+                        <td style="font-family: monospace; font-weight: 700; color: hsl(var(--accent));">{{ item.product.selling_price|floatformat:2 }} ETB</td>
+                        <td>
+                            <a href="{% url 'add_to_cart' item.product.id %}" class="btn btn-sm btn-primary">+ Cart</a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div style="background: hsla(var(--bg-hover) / 0.3); border: 1px dashed hsl(var(--border)); border-radius: 8px; padding: 1rem; color: hsl(var(--text-muted)); font-size: 0.88rem;">
+            No direct substitute parts linked in catalog. (Interchangeable OEM and aftermarket brands can be connected via Admin > Part Substitutes).
+        </div>
+        {% endif %}
+    </div>
 </div>
-{% endblock %}
+
+<!-- ================= 4. ALL COMPATIBLE VEHICLES LIST ================= -->
+<div class="card" style="padding: 1.75rem;">
+    <h2 style="margin-bottom: 1.25rem; font-size: 1.2rem; border-bottom: 1px solid hsl(var(--border)); padding-bottom: 0.75rem; display: flex; align-items: center; gap: 0.5rem;">
+        <span>🚘</span> Vehicle Applications & Chassis Fitment List
+    </h2>
+    <div style="display: flex; flex-wrap: wrap; gap: 0.65rem;">
+        {% if product.compatibilities.exists %}
+            {% for cm in product.compatibilities.all %}
+            <div style="background: hsla(var(--bg-hover) / 0.6); border: 1px solid hsl(var(--border)); padding: 0.6rem 1rem; border-radius: 8px; font-size: 0.9rem;">
+                <div style="font-weight: 700; color: hsl(var(--text));">
+                    {{ cm.make.name }} {{ cm.name }}
+                </div>
+                <div style="font-size: 0.8rem; color: hsl(var(--text-muted)); margin-top: 0.15rem;">
+                    Years: {{ cm.year_from|default:'' }}–{{ cm.year_to|default:'Present' }}
+                    {% if cm.chassis_prefixes %}
+                    · Chassis: <code style="font-weight: 700;">{{ cm.chassis_prefixes }}</code>
+                    {% endif %}
+                </div>
+            </div>
+            {% endfor %}
+        {% else %}
+            <p style="color: hsl(var(--text-muted));">{{ product.vehicle_application|default:"No specific vehicle applications recorded." }}</p>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

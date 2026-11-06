@@ -1,0 +1,287 @@
+{% extends 'store/base.html' %}
+
+{% block title %}PARTSOUQ | Genuine Auto Parts Catalog & Exploded Schematics{% endblock %}
+
+{% block extra_head %}
+<style>
+    /* Hero Banner */
+    .hero-banner { background: linear-gradient(135deg, #0b132b 0%, #1c2541 60%, #1e293b 100%); border-radius: 12px; padding: 40px 30px; color: white; margin-bottom: 30px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); position: relative; overflow: hidden; }
+    .hero-banner::after { content: "\f1b9"; font-family: "Font Awesome 6 Free"; font-weight: 900; position: absolute; right: -20px; bottom: -40px; font-size: 14rem; color: rgba(255,255,255,0.03); pointer-events: none; }
+    
+    .hero-title { font-family: 'Outfit', sans-serif; font-size: 2.2rem; font-weight: 800; margin-bottom: 10px; }
+    .hero-subtitle { color: #94a3b8; font-size: 1.05rem; margin-bottom: 25px; max-width: 650px; }
+
+    .hero-search-box { background: rgba(255,255,255,0.08); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.15); border-radius: 10px; padding: 20px; max-width: 750px; }
+    
+    .hero-search-tabs { display: flex; gap: 10px; margin-bottom: 15px; }
+    .hero-tab { background: rgba(255,255,255,0.1); border: none; color: white; padding: 8px 16px; border-radius: 6px; font-size: 0.9rem; font-weight: 600; cursor: pointer; }
+    .hero-tab.active { background: var(--accent-blue); }
+
+    /* Makes Grid */
+    .makes-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 16px; }
+    .make-card { background: white; border: 1px solid var(--border-color); border-radius: 10px; padding: 18px; text-decoration: none; color: var(--text-dark); transition: all 0.25s ease; position: relative; }
+    .make-card:hover { border-color: var(--accent-blue); transform: translateY(-4px); box-shadow: 0 8px 20px rgba(0,0,0,0.08); }
+    .make-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+    .make-title { font-family: 'Outfit', sans-serif; font-size: 1.2rem; font-weight: 800; color: var(--header-navy); }
+    .make-count { background: #f1f5f9; color: var(--accent-blue); font-size: 0.75rem; font-weight: 700; padding: 2px 8px; border-radius: 12px; }
+    .model-pills { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+    .model-pill { background: #f8fafc; border: 1px solid #e2e8f0; color: #475569; font-size: 0.75rem; padding: 3px 8px; border-radius: 4px; font-weight: 500; }
+
+    /* Categories Grid */
+    .asm-categories-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 16px; }
+    .asm-cat-card { background: white; border: 1px solid var(--border-color); border-radius: 10px; padding: 20px; display: flex; align-items: flex-start; gap: 15px; text-decoration: none; color: var(--text-dark); transition: all 0.2s; }
+    .asm-cat-card:hover { border-color: var(--accent-blue); background: #f8fafc; transform: translateY(-2px); }
+    .asm-cat-icon { width: 44px; height: 44px; background: #e0f2fe; color: var(--accent-blue); border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 1.3rem; flex-shrink: 0; }
+    .asm-cat-info h3 { font-family: 'Outfit', sans-serif; font-size: 1rem; font-weight: 700; color: var(--header-navy); margin-bottom: 4px; }
+    .asm-cat-info p { font-size: 0.8rem; color: var(--text-muted); line-height: 1.4; }
+
+    /* Diagrams Grid */
+    .diagrams-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 20px; }
+    .diagram-card { background: white; border: 1px solid var(--border-color); border-radius: 10px; overflow: hidden; text-decoration: none; color: var(--text-dark); transition: all 0.2s; }
+    .diagram-card:hover { border-color: var(--accent-blue); box-shadow: 0 6px 16px rgba(0,0,0,0.08); }
+    .diagram-preview { height: 160px; background: #f1f5f9; display: flex; align-items: center; justify-content: center; position: relative; border-bottom: 1px solid #e2e8f0; }
+    .diagram-preview-placeholder { text-align: center; color: #94a3b8; }
+    .diagram-preview-placeholder i { font-size: 3rem; margin-bottom: 8px; display: block; color: #cbd5e1; }
+    .diagram-code-badge { position: absolute; top: 10px; left: 10px; background: var(--bg-dark); color: white; font-family: monospace; font-size: 0.75rem; padding: 2px 8px; border-radius: 4px; font-weight: 700; }
+    .diagram-body { padding: 16px; }
+    .diagram-car { font-size: 0.75rem; color: var(--accent-blue); font-weight: 700; text-transform: uppercase; margin-bottom: 4px; }
+    .diagram-title { font-family: 'Outfit', sans-serif; font-size: 1rem; font-weight: 700; color: var(--header-navy); line-height: 1.3; margin-bottom: 8px; }
+
+    /* Products Grid */
+    .parts-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 20px; }
+    .part-card { background: white; border: 1px solid var(--border-color); border-radius: 10px; padding: 18px; display: flex; flex-direction: column; justify-content: space-between; transition: all 0.2s; }
+    .part-card:hover { border-color: var(--accent-blue); box-shadow: 0 6px 16px rgba(0,0,0,0.06); }
+    .part-number-tag { font-family: monospace; font-size: 0.95rem; font-weight: 800; color: var(--accent-blue); background: #f0f9ff; padding: 4px 8px; border-radius: 4px; display: inline-block; margin-bottom: 8px; }
+    .part-name { font-weight: 600; font-size: 0.95rem; color: var(--header-navy); margin-bottom: 10px; line-height: 1.3; }
+    .part-meta { font-size: 0.8rem; color: var(--text-muted); margin-bottom: 14px; }
+    .part-price-row { display: flex; align-items: center; justify-content: space-between; margin-top: auto; padding-top: 12px; border-top: 1px solid #f1f5f9; }
+    .part-price { font-family: 'Outfit', sans-serif; font-size: 1.25rem; font-weight: 800; color: var(--header-navy); }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<!-- Hero Banner -->
+<div class="hero-banner">
+    <h1 class="hero-title">OEM Auto Spare Parts & Exploded Schematics</h1>
+    <p class="hero-subtitle">Partsouq & Amayama style single-shop direct spare parts catalog. Fast VIN decoding, genuine OEM part number cross-referencing, and real-time shop warehouse inventory.</p>
+
+    <div class="hero-search-box">
+        <div class="hero-search-tabs">
+            <button class="hero-tab active" id="heroVinTab" onclick="switchHeroSearch('vin')"><i class="fa-solid fa-barcode"></i> VIN / Chassis Frame Lookup</button>
+            <button class="hero-tab" id="heroPartTab" onclick="switchHeroSearch('part')"><i class="fa-solid fa-magnifying-glass"></i> OEM Part # Search</button>
+        </div>
+
+        <form action="{% url 'store:vin_lookup' %}" method="get" id="heroVinForm" class="search-input-group">
+            <input type="text" name="vin" placeholder="Enter VIN or Chassis Frame Code (e.g., VZN130, GRJ150, JTEBU25J...)" required>
+            <button type="submit"><i class="fa-solid fa-magnifying-glass me-1"></i> Decode Vehicle</button>
+        </form>
+
+        <form action="{% url 'store:oem_search' %}" method="get" id="heroPartForm" class="search-input-group" style="display: none;">
+            <input type="text" name="q" placeholder="Enter OEM Part # or Description (e.g., 90915-YZZD1, 04465-35290)..." required>
+            <button type="submit"><i class="fa-solid fa-search me-1"></i> Search Parts</button>
+        </form>
+    </div>
+</div>
+
+<!-- Select Vehicle Make Grid -->
+<div class="card">
+    <div class="section-header">
+        <h2 class="section-title"><i class="fa-solid fa-car"></i> Select Vehicle Make & Model</h2>
+        <span class="text-muted" style="font-size: 0.85rem;">Select your car to view exploded schematics</span>
+    </div>
+
+    <div class="makes-grid">
+        {% for make in makes %}
+        <div class="make-card">
+            <div class="make-header">
+                <span class="make-title">{{ make.name }}</span>
+                <span class="make-count">{{ make.models.count }} Models</span>
+            </div>
+            <div class="model-pills">
+                {% for model in make.models.all %}
+                <a href="{% url 'store:vehicle_categories' model.id %}" class="model-pill" title="{{ model.name }} ({{ model.year_from }}-{{ model.year_to }})">
+                    {{ model.name }}
+                </a>
+                {% empty %}
+                <span class="text-muted" style="font-size: 0.75rem;">No models</span>
+                {% endfor %}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+<!-- Assembly Categories (Partsouq Groups) -->
+<div class="card">
+    <div class="section-header">
+        <h2 class="section-title"><i class="fa-solid fa-cubes"></i> Assembly Groups & Schematics</h2>
+        <a href="{% url 'store:oem_search' %}" class="btn btn-outline btn-sm">Browse All Parts</a>
+    </div>
+
+    <div class="asm-categories-grid">
+        {% for cat in assembly_categories %}
+        <div class="asm-cat-card">
+            <div class="asm-cat-icon"><i class="fa-solid {{ cat.icon|default:'fa-cogs' }}"></i></div>
+            <div class="asm-cat-info">
+                <h3>{{ cat.name }}</h3>
+                <p>{{ cat.description|default:"Exploded schematics and OEM replacement components." }}</p>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+<!-- Featured Exploded Schematic Diagrams -->
+<div class="card">
+    <div class="section-header">
+        <h2 class="section-title"><i class="fa-solid fa-diagram-project"></i> Interactive Exploded Schematic Diagrams</h2>
+        <span class="badge badge-aftermarket">Interactive Callouts</span>
+    </div>
+
+    <div class="diagrams-grid">
+        {% for diagram in diagrams %}
+        <a href="{% url 'store:diagram_detail' diagram.id %}" class="diagram-card">
+            <div class="diagram-preview">
+                <span class="diagram-code-badge">FIG {{ diagram.diagram_code }}</span>
+                <div class="diagram-preview-placeholder">
+                    <i class="fa-solid fa-microchip"></i>
+                    <span style="font-size: 0.8rem; font-weight: 600;">Interactive Diagram #{{ diagram.diagram_code }}</span>
+                </div>
+            </div>
+            <div class="diagram-body">
+                <div class="diagram-car">{{ diagram.car_model.make.name }} {{ diagram.car_model.name }}</div>
+                <div class="diagram-title">{{ diagram.title }}</div>
+                <div style="font-size: 0.8rem; color: var(--text-muted); display: flex; justify-content: space-between; align-items: center;">
+                    <span><i class="fa-solid fa-list-ol"></i> {{ diagram.callouts.count }} Callouts</span>
+                    <span class="btn btn-sm btn-outline" style="padding: 2px 8px;"><i class="fa-solid fa-eye"></i> View Schematic</span>
+                </div>
+            </div>
+        </a>
+        {% empty %}
+        <p class="text-muted">No diagrams available.</p>
+        {% endfor %}
+    </div>
+</div>
+
+<!-- Featured In-Stock Genuine OEM Parts -->
+<div class="card">
+    <div class="section-header">
+<!-- Select Vehicle Make & Model Filter Bar -->
+<div style="background: white; border: 1px solid var(--border-color); border-radius: 10px; padding: 20px; margin-bottom: 25px; box-shadow: 0 4px 12px rgba(0,0,0,0.04);">
+    <h3 style="font-family: 'Outfit', sans-serif; font-size: 1.15rem; color: var(--header-navy); margin-bottom: 12px;">
+        <i class="fa-solid fa-car-side text-accent me-2"></i>
+        <span data-en="Find Spare Parts by Car Type & Model" data-am="የመኪናዎን አይነት በመምረጥ የሚስማሙ ስፔር ፓርቶችን ይፈልጉ">Find Spare Parts by Car Type & Model</span>
+    </h3>
+    <form action="{% url 'store:oem_search' %}" method="get" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; align-items: end;">
+        <div>
+            <label style="display: block; font-size: 0.8rem; font-weight: 700; margin-bottom: 4px; color: var(--header-navy);" data-en="Select Car Type / Model:" data-am="የመኪናዎን አይነት / ሞዴል ይምረጡ:">Select Car Type / Model:</label>
+            <select name="car_model" style="width: 100%; padding: 10px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 0.9rem; background: white;">
+                <option value="" data-en="-- All Car Types / Models --" data-am="-- ሁሉም የመኪና አይነቶች እና ሞዴሎች --">-- All Car Types / Models --</option>
+                {% for m in all_models %}
+                <option value="{{ m.id }}">{{ m.make.name }} {{ m.name }} ({{ m.year_from }}-{{ m.year_to|default:"Present" }})</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div>
+            <label style="display: block; font-size: 0.8rem; font-weight: 700; margin-bottom: 4px; color: var(--header-navy);" data-en="Search Part Name or OEM #:" data-am="የፓርት ስም ወይም ቁጥር ይፈልጉ:">Search Part Name or OEM #:</label>
+            <input type="text" name="q" placeholder="e.g. Brake Pads, Filter, 04465-35290..." data-en="e.g. Brake Pads, Filter, 04465-35290..." data-am="ምሳሌ፡ የፍሬን ጫማ፣ ኦይል ፊልተር፣ 04465-35290..." style="width: 100%; padding: 10px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 0.9rem;">
+        </div>
+        <div>
+            <button type="submit" class="btn btn-primary" style="width: 100%; padding: 10px; font-size: 0.95rem;">
+                <i class="fa-solid fa-magnifying-glass me-1"></i> <span data-en="Search Compatible Parts" data-am="የሚስማሙ ፓርቶችን ፈልግ">Search Compatible Parts</span>
+            </button>
+        </div>
+    </form>
+</div>
+
+<!-- Featured Products Grid -->
+<div class="card">
+    <div class="section-header">
+        <h2 class="section-title"><i class="fa-solid fa-boxes-stacked"></i> <span data-en="In-Stock Genuine OEM Spare Parts" data-am="በክምችት ላይ ያሉ ኦሪጂናል ስፔር ፓርቶች">In-Stock Genuine OEM Spare Parts</span></h2>
+        <a href="{% url 'store:oem_search' %}" class="btn btn-outline btn-sm" data-en="View Full Catalog" data-am="ሙሉ ካታሎግ ይመልከቱ">View Full Catalog</a>
+    </div>
+
+    <div class="parts-grid">
+        {% for prod in featured_products %}
+        <div class="part-card">
+            <div>
+                <div style="width: 100%; height: 130px; border-radius: 8px; overflow: hidden; background: #f8fafc; border: 1px solid #e2e8f0; display: flex; align-items: center; justify-content: center; margin-bottom: 12px;">
+                    {% if prod.image %}
+                    <img src="{{ prod.image.url }}" alt="{{ prod.name }}" style="width: 100%; height: 100%; object-fit: cover;">
+                    {% else %}
+                    <i class="fa-solid fa-gears" style="font-size: 2.5rem; color: #cbd5e1;"></i>
+                    {% endif %}
+                </div>
+                <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                    <span class="part-number-tag">{{ prod.part_number|default:prod.sku }}</span>
+                    {% if prod.is_genuine %}
+                    <span class="badge badge-genuine"><i class="fa-solid fa-shield-halved"></i> <span data-en="Genuine" data-am="ኦሪጂናል">Genuine</span></span>
+                    {% else %}
+                    <span class="badge badge-aftermarket" data-en="Aftermarket" data-am="አፍተርማርኬት">Aftermarket</span>
+                    {% endif %}
+                </div>
+                <a href="{% url 'store:oem_part_detail' prod.id %}" style="text-decoration: none;">
+                    <div class="part-name">{{ prod.name }}</div>
+                </a>
+                <div class="part-meta">
+                    <div><strong><span data-en="Brand:" data-am="ብራንድ:">Brand:</span></strong> {{ prod.brand }}</div>
+                    
+                    <!-- Car Types Compatibility -->
+                    <div style="font-size: 0.78rem; color: #475569; margin-top: 6px; background: #f8fafc; padding: 4px 8px; border-radius: 4px; border: 1px solid #e2e8f0;">
+                        <i class="fa-solid fa-car-side text-accent me-1"></i> <strong><span data-en="Fits Car Types:" data-am="የሚስማማቸው የመኪና አይነቶች:">Fits Car Types:</span></strong>
+                        {% if prod.compatibilities.all %}
+                            {% for comp in prod.compatibilities.all|slice:":3" %}
+                                <span class="badge" style="background:#e0f2fe; color:#0369a1; font-size: 0.72rem; padding: 2px 6px;">{{ comp.make.name }} {{ comp.name }}</span>
+                            {% endfor %}
+                        {% elif prod.vehicle_application %}
+                            <span class="badge" style="background:#f1f5f9; color:#475569; font-size: 0.72rem; padding: 2px 6px;">{{ prod.vehicle_application }}</span>
+                        {% else %}
+                            <span class="text-muted" style="font-size: 0.72rem;">Multiple Car Models</span>
+                        {% endif %}
+                    </div>
+
+                    <div class="mt-2">
+                        {% if prod.quantity > 0 %}
+                        <span class="badge badge-stock"><i class="fa-solid fa-check-circle"></i> <span data-en="In Stock" data-am="በክምችት ላይ አለ">In Stock</span></span>
+                        {% else %}
+                        <span class="badge" style="background:#fee2e2; color:#991b1b;" data-en="Out of Stock" data-am="ያለቀ">Out of Stock</span>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            <div class="part-price-row">
+                <div class="part-price">${{ prod.selling_price|floatformat:2 }}</div>
+                <a href="{% url 'store:add_to_cart' prod.id %}" class="btn btn-primary btn-sm">
+                    <i class="fa-solid fa-cart-plus"></i> <span data-en="Add to Cart" data-am="ወደ ቅርጫት ጨምር">Add to Cart</span>
+                </a>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    function switchHeroSearch(tab) {
+        const heroVinForm = document.getElementById('heroVinForm');
+        const heroPartForm = document.getElementById('heroPartForm');
+        const heroVinTab = document.getElementById('heroVinTab');
+        const heroPartTab = document.getElementById('heroPartTab');
+
+        if (tab === 'vin') {
+            heroVinForm.style.display = 'flex';
+            heroPartForm.style.display = 'none';
+            heroVinTab.classList.add('active');
+            heroPartTab.classList.remove('active');
+        } else {
+            heroVinForm.style.display = 'none';
+            heroPartForm.style.display = 'flex';
+            heroPartTab.classList.add('active');
+            heroVinTab.classList.remove('active');
+        }
+    }
+</script>
+{% endblock %}

@@ -1,0 +1,291 @@
+{% extends "base.html" %}
+
+{% block title %}New Import Shipment & Landed Costing - {{ app_name }}{% endblock %}
+
+{% block page_title %}New Import Shipment & Landed Cost Calculator (የውጭ ዕቃዎች ማስገቢያ){% endblock %}
+
+{% block content %}
+<div class="header-actions" style="margin-bottom: 1.25rem;">
+    <a href="{% url 'import_shipments_list' %}" class="btn btn-secondary btn-sm">← Back to Import Shipments</a>
+</div>
+
+<form method="post" id="import-form">
+    {% csrf_token %}
+
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 1.5rem; margin-bottom: 1.5rem;">
+        <!-- Shipment Info & Logistics -->
+        <div class="card">
+            <h3 style="font-size: 1.05rem; margin-top: 0; margin-bottom: 1rem; color: #0f766e; display: flex; align-items: center; gap: 0.5rem;">
+                <span>🚢</span> Origin & Logistics Information
+            </h3>
+
+            <div style="margin-bottom: 0.75rem;">
+                <label style="font-size: 0.82rem; font-weight: 700; display: block; margin-bottom: 0.25rem;">Shipment Title / Container Description *:</label>
+                <input type="text" name="title" placeholder="e.g. 20ft Container - Toyota Brake & Suspension Parts" required class="form-input" style="width: 100%;">
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; margin-bottom: 0.75rem;">
+                <div>
+                    <label style="font-size: 0.82rem; font-weight: 700; display: block; margin-bottom: 0.25rem;">Supplier / Manufacturer:</label>
+                    <select name="supplier_id" class="form-select" style="width: 100%;">
+                        <option value="">-- Select Supplier --</option>
+                        {% for s in suppliers %}
+                            <option value="{{ s.id }}">{{ s.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div>
+                    <label style="font-size: 0.82rem; font-weight: 700; display: block; margin-bottom: 0.25rem;">Destination Store / Warehouse *:</label>
+                    <select name="warehouse_id" class="form-select" required style="width: 100%;">
+                        {% for w in warehouses %}
+                            <option value="{{ w.id }}">{{ w.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; margin-bottom: 0.75rem;">
+                <div>
+                    <label style="font-size: 0.82rem; font-weight: 700; display: block; margin-bottom: 0.25rem;">Country of Origin:</label>
+                    <select name="origin_country" class="form-select" style="width: 100%;">
+                        <option value="China" selected>China (ቻይና)</option>
+                        <option value="United Arab Emirates (Dubai)">UAE (ዱባይ)</option>
+                        <option value="Turkey">Turkey (ቱርክ)</option>
+                        <option value="Japan">Japan (ጃፓን)</option>
+                        <option value="Germany">Germany (ጀርመን)</option>
+                        <option value="India">India (ህንድ)</option>
+                        <option value="Other">Other Country</option>
+                    </select>
+                </div>
+                <div>
+                    <label style="font-size: 0.82rem; font-weight: 700; display: block; margin-bottom: 0.25rem;">Departure Port:</label>
+                    <input type="text" name="departure_port" placeholder="e.g. Ningbo / Jebel Ali" class="form-input" style="width: 100%;">
+                </div>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem;">
+                <div>
+                    <label style="font-size: 0.82rem; font-weight: 700; display: block; margin-bottom: 0.25rem;">Arrival Port in Ethiopia:</label>
+                    <input type="text" name="arrival_port" value="Modjo Dry Port / Addis Ababa" class="form-input" style="width: 100%;">
+                </div>
+                <div>
+                    <label style="font-size: 0.82rem; font-weight: 700; display: block; margin-bottom: 0.25rem;">Bill of Lading (B/L) / AWB #:</label>
+                    <input type="text" name="bill_of_lading" placeholder="e.g. COSU62918291" class="form-input" style="width: 100%; font-family: monospace;">
+                </div>
+            </div>
+        </div>
+
+        <!-- Currency & Ethiopian Landed Cost Breakdown -->
+        <div class="card">
+            <h3 style="font-size: 1.05rem; margin-top: 0; margin-bottom: 1rem; color: #0f766e; display: flex; align-items: center; gap: 0.5rem;">
+                <span>💵</span> Currency & Ethiopian Landed Overheads (ወጪዎች)
+            </h3>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; margin-bottom: 0.75rem; background: hsla(var(--accent) / 0.08); padding: 0.75rem; border-radius: 6px;">
+                <div>
+                    <label style="font-size: 0.82rem; font-weight: 700; display: block; margin-bottom: 0.25rem;">Purchase Currency:</label>
+                    <select name="currency" class="form-select" id="currency-select" style="width: 100%; font-weight: 700;">
+                        <option value="USD" selected>USD ($ - US Dollar)</option>
+                        <option value="EUR">EUR (€ - Euro)</option>
+                        <option value="AED">AED (UAE Dirham)</option>
+                        <option value="CNY">CNY (RMB - Chinese Yuan)</option>
+                    </select>
+                </div>
+                <div>
+                    <label style="font-size: 0.82rem; font-weight: 700; display: block; margin-bottom: 0.25rem;">Customs Exchange Rate to ETB *:</label>
+                    <input type="number" step="0.01" name="exchange_rate" id="exchange-rate-input" value="135.00" class="form-input" style="width: 100%; font-weight: 800; font-family: monospace;" oninput="updateCalculations()">
+                </div>
+            </div>
+
+            <!-- Landed Expenses Grid -->
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.65rem; margin-bottom: 0.65rem;">
+                <div>
+                    <label style="font-size: 0.78rem; font-weight: 600; display: block; margin-bottom: 0.2rem;">Sea/Air Freight (ETB):</label>
+                    <input type="number" step="0.01" name="freight_cost_etb" value="0.00" class="form-input expense-input" style="width: 100%;" oninput="updateCalculations()">
+                </div>
+                <div>
+                    <label style="font-size: 0.78rem; font-weight: 600; display: block; margin-bottom: 0.2rem;">Cargo Insurance (ETB):</label>
+                    <input type="number" step="0.01" name="insurance_cost_etb" value="0.00" class="form-input expense-input" style="width: 100%;" oninput="updateCalculations()">
+                </div>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.65rem; margin-bottom: 0.65rem;">
+                <div>
+                    <label style="font-size: 0.78rem; font-weight: 600; display: block; margin-bottom: 0.2rem;">Customs Duty & Tariffs (ETB):</label>
+                    <input type="number" step="0.01" name="customs_duty_etb" value="0.00" class="form-input expense-input" style="width: 100%;" oninput="updateCalculations()">
+                </div>
+                <div>
+                    <label style="font-size: 0.78rem; font-weight: 600; display: block; margin-bottom: 0.2rem;">Port Handling & Transit (ETB):</label>
+                    <input type="number" step="0.01" name="port_handling_etb" value="0.00" class="form-input expense-input" style="width: 100%;" oninput="updateCalculations()">
+                </div>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.65rem;">
+                <div>
+                    <label style="font-size: 0.78rem; font-weight: 600; display: block; margin-bottom: 0.2rem;">Inland Trucking to Shop (ETB):</label>
+                    <input type="number" step="0.01" name="inland_transport_etb" value="0.00" class="form-input expense-input" style="width: 100%;" oninput="updateCalculations()">
+                </div>
+                <div>
+                    <label style="font-size: 0.78rem; font-weight: 600; display: block; margin-bottom: 0.2rem;">Bank LC & Other Fees (ETB):</label>
+                    <input type="number" step="0.01" name="other_clearing_costs_etb" value="0.00" class="form-input expense-input" style="width: 100%;" oninput="updateCalculations()">
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Imported Parts Table -->
+    <div class="card" style="margin-bottom: 1.5rem;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+            <h3 style="font-size: 1.05rem; margin: 0; color: #0f766e; display: flex; align-items: center; gap: 0.5rem;">
+                <span>📦</span> Imported Materials & Parts List
+            </h3>
+            <button type="button" class="btn btn-secondary btn-sm" onclick="addImportRow()" style="font-weight: 700;">
+                ➕ Add Part to Shipment
+            </button>
+        </div>
+
+        <div class="table-container">
+            <table class="sortable-table" id="import-items-table">
+                <thead>
+                    <tr>
+                        <th style="width: 32%;">Spare Part / Material</th>
+                        <th style="width: 12%;">HS Tariff Code</th>
+                        <th style="width: 10%; text-align: center;">Quantity</th>
+                        <th style="width: 14%; text-align: right;">Unit FOB (<span id="th-currency">USD</span>)</th>
+                        <th style="width: 14%; text-align: right;">Total FOB (<span id="th-currency-tot">USD</span>)</th>
+                        <th style="width: 14%; text-align: right;">Target Selling (ETB)</th>
+                        <th style="width: 4%; text-align: center;">✕</th>
+                    </tr>
+                </thead>
+                <tbody id="import-tbody">
+                    <!-- Dynamic rows will be inserted here -->
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Landed Cost Summary Box -->
+        <div style="display: flex; justify-content: flex-end; margin-top: 1.5rem; border-top: 2px solid hsl(var(--border)); padding-top: 1.25rem;">
+            <div style="width: 360px; background: hsla(var(--bg-hover) / 0.5); padding: 1.25rem; border-radius: 8px; border: 1px solid hsl(var(--border));">
+                <div style="display: flex; justify-content: space-between; font-size: 0.85rem; color: hsl(var(--text-muted)); margin-bottom: 0.35rem;">
+                    <span>Total FOB Purchase (Foreign):</span>
+                    <span id="fob-foreign-display" style="font-weight: 700; font-family: monospace;">0.00 USD</span>
+                </div>
+                <div style="display: flex; justify-content: space-between; font-size: 0.85rem; color: hsl(var(--text-muted)); margin-bottom: 0.35rem;">
+                    <span>Total FOB Purchase in ETB:</span>
+                    <span id="fob-etb-display" style="font-weight: 700; font-family: monospace;">0.00 ETB</span>
+                </div>
+                <div style="display: flex; justify-content: space-between; font-size: 0.85rem; color: hsl(var(--text-muted)); margin-bottom: 0.5rem;">
+                    <span>Total Direct Landed Overheads:</span>
+                    <span id="overhead-display" style="font-weight: 700; font-family: monospace;">0.00 ETB</span>
+                </div>
+                <div style="display: flex; justify-content: space-between; font-size: 1.25rem; font-weight: 900; border-top: 1.5px dashed hsl(var(--border)); padding-top: 0.5rem; color: #0f766e;">
+                    <span>Total Landed Cost:</span>
+                    <span id="grand-landed-display" style="font-family: monospace;">0.00 ETB</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div style="display: flex; justify-content: flex-end; gap: 1rem;">
+        <a href="{% url 'import_shipments_list' %}" class="btn btn-secondary">Cancel</a>
+        <button type="submit" class="btn" style="background: #0f766e; color: #ffffff; font-weight: 700; font-size: 1.05rem; padding: 0.75rem 2rem;">
+            ✓ Save & Calculate Landed Unit Costs →
+        </button>
+    </div>
+</form>
+
+<script>
+const INVENTORY_PARTS = [
+    {% for p in products %}
+    {
+        id: {{ p.id }},
+        part_number: "{{ p.part_number|escapejs }}",
+        name: "{{ p.name|escapejs }}",
+        brand: "{{ p.brand|escapejs }}",
+        unit: "{{ p.uom_short|escapejs }}",
+        cost: {{ p.cost_price }},
+        price: {{ p.selling_price }}
+    },
+    {% endfor %}
+];
+
+function createImportRow() {
+    let options = '<option value="">-- Select Existing Spare Part --</option>';
+    INVENTORY_PARTS.forEach(p => {
+        options += `<option value="${p.id}">[${p.part_number || '—'}] ${p.name} (${p.unit})</option>`;
+    });
+
+    return `
+    <tr class="import-item-row">
+        <td>
+            <select name="item_product_id[]" class="form-select" required style="width: 100%; font-size: 0.85rem;">
+                ${options}
+            </select>
+        </td>
+        <td>
+            <input type="text" name="item_hs_code[]" placeholder="e.g. 8708.29" class="form-input" style="width: 100%; font-family: monospace; font-size: 0.85rem;">
+        </td>
+        <td>
+            <input type="number" step="any" name="item_qty[]" value="10" min="1" required class="form-input qty-input" style="width: 100%; text-align: center; font-size: 0.85rem;" oninput="updateCalculations()">
+        </td>
+        <td>
+            <input type="number" step="0.01" name="item_fob_price[]" value="0.00" min="0" required class="form-input fob-input" style="width: 100%; text-align: right; font-family: monospace; font-size: 0.85rem;" oninput="updateCalculations()">
+        </td>
+        <td style="text-align: right; font-weight: 700; font-family: monospace;" class="row-tot-fob">
+            0.00
+        </td>
+        <td>
+            <input type="number" step="0.01" name="item_target_price[]" placeholder="Auto / Manual" class="form-input" style="width: 100%; text-align: right; font-family: monospace; font-size: 0.85rem;">
+        </td>
+        <td style="text-align: center;">
+            <button type="button" class="btn btn-danger btn-sm" onclick="this.closest('tr').remove(); updateCalculations();" style="padding: 0.2rem 0.5rem;">✕</button>
+        </td>
+    </tr>
+    `;
+}
+
+function addImportRow() {
+    document.getElementById('import-tbody').insertAdjacentHTML('beforeend', createImportRow());
+    updateCalculations();
+}
+
+function updateCalculations() {
+    const currency = document.getElementById('currency-select').value;
+    document.getElementById('th-currency').textContent = currency;
+    document.getElementById('th-currency-tot').textContent = currency;
+
+    const rate = parseFloat(document.getElementById('exchange-rate-input').value) || 135.0;
+
+    let totalForeignFob = 0;
+    const rows = document.querySelectorAll('.import-item-row');
+    rows.forEach(r => {
+        const q = parseFloat(r.querySelector('.qty-input').value) || 0;
+        const p = parseFloat(r.querySelector('.fob-input').value) || 0;
+        const lineFob = q * p;
+        totalForeignFob += lineFob;
+        r.querySelector('.row-tot-fob').textContent = lineFob.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + ' ' + currency;
+    });
+
+    const totalFobEtb = totalForeignFob * rate;
+
+    // Sum all direct expenses
+    let totalOverheadEtb = 0;
+    document.querySelectorAll('.expense-input').forEach(inp => {
+        totalOverheadEtb += parseFloat(inp.value) || 0;
+    });
+
+    const grandLandedEtb = totalFobEtb + totalOverheadEtb;
+
+    document.getElementById('fob-foreign-display').textContent = totalForeignFob.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + ' ' + currency;
+    document.getElementById('fob-etb-display').textContent = totalFobEtb.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + ' ETB';
+    document.getElementById('overhead-display').textContent = totalOverheadEtb.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + ' ETB';
+    document.getElementById('grand-landed-display').textContent = grandLandedEtb.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + ' ETB';
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    document.getElementById('currency-select').addEventListener('change', updateCalculations);
+    addImportRow();
+    addImportRow();
+});
+</script>
+{% endblock %}
