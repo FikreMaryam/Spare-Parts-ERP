@@ -310,8 +310,22 @@ def import_inventory(request):
     try:
         wb = load_workbook(excel_file, read_only=True, data_only=True)
         ws = wb.active
-        first_row = list(ws.iter_rows(min_row=1, max_row=1, values_only=True))[0]
+        first_row = next(ws.iter_rows(min_row=1, max_row=1, values_only=True), ())
         first_cell = str(first_row[0] or "").upper() if first_row else ""
+        header_columns = {
+            str(value).strip().casefold(): index
+            for index, value in enumerate(first_row)
+            if value is not None and str(value).strip()
+        }
+
+        def column_value(row, names, fallback_index=None):
+            for name in names:
+                index = header_columns.get(name)
+                if index is not None and index < len(row):
+                    return row[index]
+            if fallback_index is not None and fallback_index < len(row):
+                return row[fallback_index]
+            return None
 
         # Detect format: "PART NAME" in header = spare parts format (INVENTORY.xlsx)
         is_spare_parts_format = first_cell and "PART NAME" in first_cell
@@ -348,21 +362,36 @@ def import_inventory(request):
                 category_name = type_name
                 vehicle_application = car_used
                 location = ""  # Physical storage - set manually
+                cost_price = 0.0
                 selling_price = 0.0  # Not in spare parts file - set in Admin after import
             else:
                 # Standard format: Part Number, Name, Brand, Category, Qty, Cost, Price, Location, Purpose, Vehicle
-                part_number = str(row[0] or "").strip() if row[0] is not None else ""
-                name = str(row[1] or "").strip() if row[1] is not None else ""
+                part_number_value = column_value(row, ("part number", "part #", "part no"), 0)
+                name_value = column_value(row, ("name", "part name"), 1)
+                part_number = str(part_number_value or "").strip()
+                name = str(name_value or "").strip()
                 if not name:
                     errors.append(f"Row {row_num}: Name is required.")
                     continue
-                brand = str(row[2] or "").strip() if len(row) > 2 and row[2] else ""
-                category_name = str(row[3] or "").strip() if len(row) > 3 and row[3] else ""
-                quantity = int(row[4] or 0) if len(row) > 4 and row[4] is not None else 0
-                selling_price = float(row[5] or 0) if len(row) > 5 and row[5] is not None else 0.0
-                location = str(row[6] or "").strip() if len(row) > 6 and row[6] else ""
-                purpose_val = str(row[7] or "").strip() if len(row) > 7 and row[7] else ""
-                vehicle_app = str(row[8] or "").strip() if len(row) > 8 and row[8] else ""
+                brand_value = column_value(row, ("brand", "mark"), 2)
+                category_value = column_value(row, ("category", "type"), 3)
+                quantity_value = column_value(row, ("quantity", "qty", "stock"), 4)
+                cost_value = column_value(row, ("cost price", "cost"))
+                selling_price_value = column_value(row, ("selling price", "price"), 5)
+                location_value = column_value(row, ("location", "storage location"), 6)
+                purpose_value = column_value(row, ("purpose",))
+                vehicle_value = column_value(
+                    row,
+                    ("vehicle/car types / chassis", "vehicle", "vehicle application", "car types"),
+                )
+                brand = str(brand_value or "").strip()
+                category_name = str(category_value or "").strip()
+                quantity = int(quantity_value or 0)
+                cost_price = float(cost_value or 0)
+                selling_price = float(selling_price_value or 0)
+                location = str(location_value or "").strip()
+                purpose_val = str(purpose_value or "").strip()
+                vehicle_app = str(vehicle_value or "").strip()
 
             category = None
             if category_name:
@@ -378,7 +407,7 @@ def import_inventory(request):
                 brand=brand[:50] if brand else "",
                 category=category,
                 quantity=max(0, quantity),
-                cost_price=0.0,
+                cost_price=max(0, cost_price),
                 selling_price=max(0, selling_price),
                 location=location[:150] if location else "",
                 purpose=purpose_val[:150] if purpose_val else "",

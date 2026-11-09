@@ -1,5 +1,9 @@
+from io import BytesIO
+
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase
 from django.urls import reverse
+from openpyxl import Workbook
 
 from .models import (
     CarMake,
@@ -11,6 +15,54 @@ from .models import (
     PurchaseItem,
     StockMovement,
 )
+
+
+class InventoryExcelImportTests(TestCase):
+    def setUp(self):
+        from django.contrib.auth import get_user_model
+
+        user = get_user_model().objects.create_user(username="inventory-importer", password="pass")
+        self.client.force_login(user)
+
+    def _import_workbook(self, headers, row):
+        workbook = Workbook()
+        worksheet = workbook.active
+        worksheet.append(headers)
+        worksheet.append(row)
+        content = BytesIO()
+        workbook.save(content)
+        upload = SimpleUploadedFile("inventory.xlsx", content.getvalue())
+        return self.client.post(reverse("import_inventory"), {"file": upload})
+
+    def test_imports_exported_inventory_columns_by_header(self):
+        response = self._import_workbook(
+            [
+                "Part Number", "Name", "Brand", "Category", "Quantity",
+                "Cost Price", "Selling Price", "Location", "Purpose",
+                "Vehicle/Car Types / Chassis",
+            ],
+            ["P-100", "Brake Pad", "BrandX", "Brakes", 6, 12.5, 20.0, "A-3", "Front", "Model Z"],
+        )
+
+        self.assertEqual(response.status_code, 200)
+        product = Product.objects.get(part_number="P-100")
+        self.assertEqual(product.cost_price, 12.5)
+        self.assertEqual(product.selling_price, 20.0)
+        self.assertEqual(product.location, "A-3")
+        self.assertEqual(product.purpose, "Front")
+        self.assertEqual(product.vehicle_application, "Model Z")
+
+    def test_imports_legacy_standard_columns(self):
+        response = self._import_workbook(
+            ["Part Number", "Name", "Brand", "Category", "Quantity", "Selling Price", "Location"],
+            ["P-200", "Oil Filter", "BrandY", "Filters", 4, 8.5, "B-2"],
+        )
+
+        self.assertEqual(response.status_code, 200)
+        product = Product.objects.get(part_number="P-200")
+        self.assertEqual(product.cost_price, 0)
+        self.assertEqual(product.selling_price, 8.5)
+        self.assertEqual(product.location, "B-2")
 
 
 class ChassisLookupTests(TestCase):
