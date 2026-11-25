@@ -9,11 +9,14 @@ from django.db import transaction
 from django.db.models import Q, Sum
 from django.core.paginator import Paginator
 from openpyxl import Workbook, load_workbook
+from openpyxl.styles import Alignment, Font, PatternFill
 from openpyxl.utils import get_column_letter
 
+from .forms import ProductForm
 from .models import Product, Category, Purchase, PurchaseItem, Supplier, Warehouse, CarMake, CarModel
 from .fitment import verify_product_fitment
 from .cross_reference import get_product_cross_references, parse_alternate_numbers
+from sales.models import SaleItem
 
 
 SORT_FIELDS = {
@@ -209,7 +212,7 @@ def verify_fitment_api(request):
 
 @login_required
 def export_inventory(request):
-    """Export products to Excel file. Honors current filters when applied."""
+    """Export products to Excel in the inventory-table format."""
     products = Product.objects.select_related("category").prefetch_related("compatibilities__make")
 
     # Apply same filters as product_list for consistency
@@ -254,33 +257,157 @@ def export_inventory(request):
     ws.title = "Inventory"
 
     headers = [
-        "Part Number", "Name", "Brand", "Category", "Quantity",
-        "Cost Price", "Selling Price", "Location", "Purpose", "Vehicle/Car Types / Chassis"
+        "Product ID",
+        "SKU",
+        "Product Name",
+        "LOCATION",
+        "Category",
+        "Brand",
+        "Car Brand",
+        "Car Model",
+        "Chassis Prefixes",
+        "Supplier",
+        "Unit",
+        "Opening Stock",
+        "Purchase",
+        "Sales",
+        "Available Stock",
+        "Minimum Stock",
+        "Stock Status",
+        "Cost Price",
+        "Selling Price",
+        "Inventory Value",
+        "Gross Profit per Unit",
+        "Estimated Profit",
+        "Last Purchase Date",
+        "Remarks",
     ]
     for col, header in enumerate(headers, 1):
         ws.cell(row=1, column=col, value=header)
+    header_fill = PatternFill("solid", fgColor="1F4E78")
+    header_font = Font(bold=True, color="FFFFFF")
+    for cell in ws[1]:
+        cell.fill = header_fill
+        cell.font = header_font
+        cell.alignment = Alignment(horizontal="center", vertical="center")
+    ws.freeze_panes = "A2"
+    ws.auto_filter.ref = f"A1:{get_column_letter(len(headers))}{ws.max_row}"
 
     for row, product in enumerate(products, 2):
-        ws.cell(row=row, column=1, value=product.part_number or "")
-        ws.cell(row=row, column=2, value=product.name)
-        ws.cell(row=row, column=3, value=product.brand or "")
-        ws.cell(row=row, column=4, value=product.category.name if product.category else "")
-        ws.cell(row=row, column=5, value=product.quantity)
-        ws.cell(row=row, column=6, value=float(product.cost_price))
-        ws.cell(row=row, column=7, value=float(product.selling_price))
-        ws.cell(row=row, column=8, value=product.location or "")
-        ws.cell(row=row, column=9, value=product.purpose or "")
+        purchase_quantity = sum(
+            item.quantity
+            for item in PurchaseItem.objects.filter(product=product)
+        )
+        sales_quantity = sum(
+            item.quantity
+            for item in SaleItem.objects.filter(product=product)
+        )
+        latest_purchase = (
+            Purchase.objects.filter(items__product=product)
+            .select_related("supplier")
+            .order_by("-date")
+            .first()
+        )
+        last_purchase = (
+            Purchase.objects.filter(items__product=product)
+            .order_by("-date")
+            .values_list("date", flat=True)
+            .first()
+        )
 
-        # Format vehicle compatibilities
-        fitment_parts = []
-        if product.compatibilities.exists():
-            fitment_parts.append(", ".join([str(cm) for cm in product.compatibilities.all()]))
-        if product.vehicle_application:
-            fitment_parts.append(product.vehicle_application)
-        ws.cell(row=row, column=10, value=" | ".join(fitment_parts))
+        opening_stock = max(0, product.quantity - purchase_quantity + sales_quantity)
+        inventory_value = product.quantity * product.cost_price
+        gross_profit = product.selling_price - product.cost_price
+        estimated_profit = gross_profit * product.quantity
+        stock_status = "Out of Stock" if product.quantity == 0 else (
+            "Low Stock" if product.quantity <= product.reorder_level else "In Stock"
+        )
+        compatible_models = list(product.compatibilities.select_related("make").all())
+        car_brands = sorted({model.make.name for model in compatible_models})
+        car_models = sorted({
+            f"{model.make.name} {model.name}"
+            for model in compatible_models
+        })
+        chassis_prefixes = sorted({
+            prefix.strip()
+            for model in compatible_models
+            for prefix in (model.chassis_prefixes or "").split(",")
+            if prefix.strip()
+        })
+
+        values = [
+            product.id,
+            product.sku or "",
+            product.name,
+            product.location or "",
+            product.category.name if product.category else "",
+            product.brand or "",
+            " | ".join(car_brands),
+            " | ".join(car_models),
+            " | ".join(chassis_prefixes),
+            latest_purchase.supplier.name if latest_purchase and latest_purchase.supplier else "",
+            product.uom_short,
+            opening_stock,
+            purchase_quantity,
+            sales_quantity,
+            product.quantity,
+            product.reorder_level,
+            stock_status,
+            float(product.cost_price),
+            float(product.selling_price),
+            float(inventory_value),
+            float(gross_profit),
+            float(estimated_profit),
+            last_purchase.date() if last_purchase else "",
+            product.purpose or "",
+        ]
+        for col, value in enumerate(values, 1):
+            ws.cell(row=row, column=col, value=value)
 
     for col in range(1, len(headers) + 1):
         ws.column_dimensions[get_column_letter(col)].width = 18
+    ws.column_dimensions["C"].width = 32
+    ws.column_dimensions["D"].width = 24
+    ws.column_dimensions["G"].width = 24
+    ws.column_dimensions["H"].width = 32
+    ws.column_dimensions["I"].width = 28
+
+    categories_ws = wb.create_sheet("Categories")
+    categories_ws.append(["Category"])
+    for category in Category.objects.order_by("name"):
+        categories_ws.append([category.name])
+
+    brands_ws = wb.create_sheet("Brands")
+    brands_ws.append(["Brand"])
+    for brand in Product.objects.exclude(brand="").exclude(brand__isnull=True).values_list("brand", flat=True).distinct().order_by("brand"):
+        brands_ws.append([brand])
+
+    car_brands_ws = wb.create_sheet("Car Brands")
+    car_brands_ws.append(["Car Brand"])
+    for make in CarMake.objects.order_by("name"):
+        car_brands_ws.append([make.name])
+
+    car_models_ws = wb.create_sheet("Car Models")
+    car_models_ws.append(["Car Brand", "Car Model", "Year From", "Year To", "Engine", "Chassis Prefixes"])
+    for model in CarModel.objects.select_related("make").order_by("make__name", "name"):
+        car_models_ws.append([
+            model.make.name,
+            model.name,
+            model.year_from or "",
+            model.year_to or "",
+            model.engine_type or "",
+            model.chassis_prefixes or "",
+        ])
+
+    for attribute_ws in (categories_ws, brands_ws, car_brands_ws, car_models_ws):
+        attribute_ws.freeze_panes = "A2"
+        attribute_ws.auto_filter.ref = attribute_ws.dimensions
+        for cell in attribute_ws[1]:
+            cell.fill = header_fill
+            cell.font = header_font
+            cell.alignment = Alignment(horizontal="center", vertical="center")
+        for col in range(1, attribute_ws.max_column + 1):
+            attribute_ws.column_dimensions[get_column_letter(col)].width = 24
 
     response = HttpResponse(
         content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
@@ -338,6 +465,10 @@ def import_inventory(request):
             if not row or not any(row):
                 continue
 
+            sku_value = None
+            unit = "PCS"
+            reorder_level = 0
+
             if is_spare_parts_format:
                 # Spare parts format: A=PART NAME, B=PART NUMBER, E=QTY, F=INSIDE PART NUMBER,
                 # G=MARK (brand), H=TYPE (category), I=PURPOSE, J=FOR WHAT CAR
@@ -366,24 +497,31 @@ def import_inventory(request):
                 selling_price = 0.0  # Not in spare parts file - set in Admin after import
             else:
                 # Standard format: Part Number, Name, Brand, Category, Qty, Cost, Price, Location, Purpose, Vehicle
-                part_number_value = column_value(row, ("part number", "part #", "part no"), 0)
-                name_value = column_value(row, ("name", "part name"), 1)
+                part_number_value = column_value(row, ("part number", "part #", "part no"))
+                name_value = column_value(row, ("product name", "name", "part name"), 2)
+                if name_value is None:
+                    name_value = column_value(row, ("name", "part name"), 1)
+                sku_value = column_value(row, ("sku", "product id"))
                 part_number = str(part_number_value or "").strip()
                 name = str(name_value or "").strip()
                 if not name:
                     errors.append(f"Row {row_num}: Name is required.")
                     continue
-                brand_value = column_value(row, ("brand", "mark"), 2)
-                category_value = column_value(row, ("category", "type"), 3)
-                quantity_value = column_value(row, ("quantity", "qty", "stock"), 4)
-                cost_value = column_value(row, ("cost price", "cost"))
-                selling_price_value = column_value(row, ("selling price", "price"), 5)
-                location_value = column_value(row, ("location", "storage location"), 6)
-                purpose_value = column_value(row, ("purpose",))
+                brand_value = column_value(row, ("brand", "mark"), 5)
+                category_value = column_value(row, ("category", "type"), 4)
+                quantity_value = column_value(row, ("available stock", "quantity", "qty", "stock"), 11)
+                cost_value = column_value(row, ("cost price", "cost"), 14)
+                selling_price_value = column_value(row, ("selling price", "price"), 15)
+                location_value = column_value(row, ("location", "storage location"), 3)
+                purpose_value = column_value(row, ("remarks", "purpose"))
                 vehicle_value = column_value(
                     row,
-                    ("vehicle/car types / chassis", "vehicle", "vehicle application", "car types"),
+                    ("car model", "vehicle/car types / chassis", "vehicle", "vehicle application", "car types"),
                 )
+                car_brand_value = column_value(row, ("car brand",))
+                chassis_value = column_value(row, ("chassis prefixes",))
+                unit_value = column_value(row, ("unit", "unit of measure"))
+                reorder_value = column_value(row, ("minimum stock", "reorder level"))
                 brand = str(brand_value or "").strip()
                 category_name = str(category_value or "").strip()
                 quantity = int(quantity_value or 0)
@@ -392,6 +530,10 @@ def import_inventory(request):
                 location = str(location_value or "").strip()
                 purpose_val = str(purpose_value or "").strip()
                 vehicle_app = str(vehicle_value or "").strip()
+                unit = str(unit_value or "PCS").strip().upper()
+                if unit not in dict(Product.UOM_CHOICES):
+                    unit = "PCS"
+                reorder_level = int(reorder_value or 0)
 
             category = None
             if category_name:
@@ -401,18 +543,66 @@ def import_inventory(request):
                 purpose_val = purpose
                 vehicle_app = vehicle_application
 
-            Product.objects.create(
-                part_number=part_number[:50],
-                name=name[:100],
-                brand=brand[:50] if brand else "",
-                category=category,
-                quantity=max(0, quantity),
-                cost_price=max(0, cost_price),
-                selling_price=max(0, selling_price),
-                location=location[:150] if location else "",
-                purpose=purpose_val[:150] if purpose_val else "",
-                vehicle_application=vehicle_app[:500] if vehicle_app else "",
-            )
+            imported_sku = str(sku_value or "").strip()[:50] if sku_value is not None else ""
+            product = None
+            if imported_sku:
+                product = Product.objects.filter(sku=imported_sku).first()
+            if product is None and part_number:
+                product = Product.objects.filter(part_number=part_number).first()
+
+            product_values = {
+                "part_number": part_number[:50],
+                "name": name[:100],
+                "brand": brand[:50] if brand else "",
+                "category": category,
+                "unit_of_measure": unit if not is_spare_parts_format else "PCS",
+                "quantity": max(0, quantity),
+                "reorder_level": max(0, reorder_level),
+                "cost_price": max(0, cost_price),
+                "selling_price": max(0, selling_price),
+                "location": location[:150] if location else "",
+                "purpose": purpose_val[:150] if purpose_val else "",
+                "vehicle_application": vehicle_app[:500] if vehicle_app else "",
+            }
+            if product:
+                for field, value in product_values.items():
+                    setattr(product, field, value)
+                product.save()
+            else:
+                product = Product.objects.create(
+                    sku=imported_sku or ProductForm.generate_unique_sku(part_number),
+                    **product_values,
+                )
+            if not is_spare_parts_format:
+                compatibility_models = []
+                car_brand_names = [
+                    value.strip()
+                    for value in str(car_brand_value or "").split("|")
+                    if value.strip()
+                ]
+                car_model_names = [
+                    value.strip()
+                    for value in str(vehicle_app or "").split("|")
+                    if value.strip()
+                ]
+                for model_name in car_model_names:
+                    model_name_parts = model_name.split()
+                    matching_make_name = next(
+                        (name for name in car_brand_names if model_name.startswith(name)),
+                        car_brand_names[0] if car_brand_names else "",
+                    )
+                    make = CarMake.objects.filter(name__iexact=matching_make_name).first() if matching_make_name else None
+                    if make:
+                        model_label = model_name[len(matching_make_name):].strip()
+                    else:
+                        model_label = model_name
+                        make = None
+                    if model_label:
+                        model = CarModel.objects.filter(make=make, name__iexact=model_label).first() if make else None
+                        if model:
+                            compatibility_models.append(model)
+                if compatibility_models:
+                    product.compatibilities.set(compatibility_models)
             created += 1
 
         wb.close()

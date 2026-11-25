@@ -8,6 +8,7 @@ from openpyxl import Workbook
 from .models import (
     CarMake,
     CarModel,
+    Category,
     Product,
     Warehouse,
     Supplier,
@@ -63,6 +64,77 @@ class InventoryExcelImportTests(TestCase):
         self.assertEqual(product.cost_price, 0)
         self.assertEqual(product.selling_price, 8.5)
         self.assertEqual(product.location, "B-2")
+
+    def test_exports_full_inventory_table_format(self):
+        product = Product.objects.create(
+            sku="INV-001",
+            part_number="P-400",
+            name="Clutch Kit",
+            brand="Sachs",
+            quantity=12,
+            reorder_level=3,
+            cost_price=40,
+            selling_price=70,
+            location="A-12",
+        )
+        make = CarMake.objects.create(name="Toyota")
+        model = CarModel.objects.create(
+            make=make,
+            name="Corolla",
+            year_from=2019,
+            year_to=2024,
+            chassis_prefixes="NRE210",
+        )
+        product.compatibilities.add(model)
+        category = Category.objects.create(name="Clutch")
+        product.category = category
+        product.save()
+
+        response = self.client.get(reverse("export_inventory"))
+
+        self.assertEqual(response.status_code, 200)
+        workbook = Workbook()
+        from openpyxl import load_workbook
+        exported = load_workbook(BytesIO(response.content), read_only=True)
+        worksheet = exported.active
+        headers = [cell.value for cell in worksheet[1]]
+        self.assertIn("Product ID", headers)
+        self.assertIn("Available Stock", headers)
+        self.assertIn("Gross Profit per Unit", headers)
+        self.assertIn("Car Brand", headers)
+        self.assertIn("Car Model", headers)
+        self.assertIn("Chassis Prefixes", headers)
+        row = next(
+            row for row in worksheet.iter_rows(min_row=2, values_only=True)
+            if row[1] == product.sku
+        )
+        self.assertEqual(row[2], "Clutch Kit")
+        self.assertEqual(row[11], 12)
+        self.assertEqual(row[6], "Toyota")
+        self.assertEqual(row[7], "Toyota Corolla")
+        self.assertEqual(row[8], "NRE210")
+        self.assertIn("Categories", exported.sheetnames)
+        self.assertIn("Brands", exported.sheetnames)
+        self.assertIn("Car Brands", exported.sheetnames)
+        self.assertIn("Car Models", exported.sheetnames)
+
+    def test_imports_multiple_products_with_unique_skus(self):
+        workbook = Workbook()
+        worksheet = workbook.active
+        worksheet.append(["Part Number", "Name", "Brand", "Category", "Quantity", "Selling Price", "Location"])
+        worksheet.append(["P-300", "Air Filter", "BrandZ", "Filters", 3, 10.0, "C-1"])
+        worksheet.append(["P-301", "Fuel Filter", "BrandZ", "Filters", 5, 12.0, "C-2"])
+        content = BytesIO()
+        workbook.save(content)
+        upload = SimpleUploadedFile("inventory.xlsx", content.getvalue())
+
+        response = self.client.post(reverse("import_inventory"), {"file": upload})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(Product.objects.filter(part_number__in=["P-300", "P-301"]).count(), 2)
+        skus = list(Product.objects.filter(part_number__in=["P-300", "P-301"]).values_list("sku", flat=True))
+        self.assertTrue(all(skus))
+        self.assertEqual(len(set(skus)), 2)
 
 
 class ChassisLookupTests(TestCase):
