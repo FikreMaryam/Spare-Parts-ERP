@@ -3,6 +3,7 @@ from . import views, crud_views
 
 urlpatterns = [
     path("", views.product_list, name="product_list"),
+    path("reorder-suggestions/", views.reorder_suggestions, name="reorder_suggestions"),
     path("export/", views.export_inventory, name="export_inventory"),
     path("import/", views.import_inventory, name="import_inventory"),
     path("warehouses/", views.warehouse_list, name="warehouse_list"),

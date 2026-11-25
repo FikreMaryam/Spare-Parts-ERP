@@ -264,7 +264,7 @@
             <div class="kpi-value">{{ metrics.total_receivables|floatformat:2 }} <span style="font-size: 0.9rem; font-weight: 500; color: hsl(var(--text-muted));">ETB</span></div>
         </div>
         <div class="kpi-sub">
-            <span>Supplier Payables: <strong>{{ metrics.total_payables|floatformat:2 }} ETB</strong></span>
+            <span>Supplier Payables: <a href="{% url 'supplier_payables' %}"><strong>{{ metrics.total_payables|floatformat:2 }} ETB</strong></a></span>
         </div>
     </div>
 </div>
@@ -328,6 +328,14 @@
             <div class="report-nav-content">
                 <h3>Purchases & Suppliers</h3>
                 <p>Procurement totals, supplier invoices, weighted-average unit costs, and receiving warehouse logs.</p>
+            </div>
+        </a>
+
+        <a href="{% url 'supplier_payables' %}" class="report-nav-card">
+            <div class="report-nav-icon">💳</div>
+            <div class="report-nav-content">
+                <h3>Supplier Payables & Payments</h3>
+                <p>Review recorded balances by supplier, enter supplier payments, and review the recent payment register.</p>
             </div>
         </a>
 

@@ -13,7 +13,7 @@
     <div style="border-bottom: 1px solid hsl(var(--border)); padding-bottom: 1rem; margin-bottom: 1.5rem;">
         <h2 style="margin: 0 0 0.35rem 0; font-size: 1.25rem;">Shop Information & Ethiopian Tax Settings</h2>
         <p class="text-muted" style="margin: 0; font-size: 0.88rem;">
-            These details appear on your official Income Statements, Balance Sheets, Invoices, and Year-End Tax Reports.
+            The shop display name is used throughout the app. Registered business details appear on official statements, invoices, and tax reports.
         </p>
     </div>
 
@@ -26,8 +26,9 @@
                 <input type="text" name="name" value="{{ profile.name }}" class="form-input" required style="width: 100%;">
             </div>
             <div class="form-group">
-                <label style="font-weight: 600; margin-bottom: 0.35rem; display: block;">Trade / Storefront Name</label>
+                <label style="font-weight: 600; margin-bottom: 0.35rem; display: block;">Shop Display Name</label>
                 <input type="text" name="trade_name" value="{{ profile.trade_name }}" class="form-input" placeholder="e.g. Addis Auto Spares" style="width: 100%;">
+                <small class="text-muted">Shown in the app navigation, page titles, login page, and storefront documents.</small>
             </div>
         </div>
 

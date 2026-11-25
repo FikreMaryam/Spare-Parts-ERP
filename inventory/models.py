@@ -69,7 +69,8 @@ class Product(models.Model):
     LOW_STOCK_THRESHOLD = 5
 
     def is_low_stock(self):
-        return self.quantity <= self.LOW_STOCK_THRESHOLD
+        threshold = self.reorder_level or self.LOW_STOCK_THRESHOLD
+        return self.quantity <= threshold
 
     @property
     def uom_short(self):

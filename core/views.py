@@ -58,7 +58,10 @@ def dashboard_view(request):
         total_products=Count("pk"),
         low_stock_count=Count(
             "pk",
-            filter=Q(quantity__lte=Product.LOW_STOCK_THRESHOLD),
+            filter=(
+                Q(reorder_level__gt=0, quantity__lte=F("reorder_level"))
+                | Q(reorder_level=0, quantity__lte=Product.LOW_STOCK_THRESHOLD)
+            ),
         ),
         total_inventory_value=Sum(
             ExpressionWrapper(
@@ -392,5 +395,4 @@ def backup_database_view(request):
     response = HttpResponse(json_data, content_type='application/json')
     response['Content-Disposition'] = f'attachment; filename="shop_data_backup_{timestamp}.json"'
     return response
-
 

@@ -6,7 +6,7 @@ from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.http import HttpResponse, JsonResponse
 from django.db import transaction
-from django.db.models import Q, Sum
+from django.db.models import Case, F, IntegerField, Q, Sum, Value, When
 from django.core.paginator import Paginator
 from openpyxl import Workbook, load_workbook
 from openpyxl.styles import Alignment, Font, PatternFill
@@ -16,7 +16,6 @@ from .forms import ProductForm
 from .models import Product, Category, Purchase, PurchaseItem, Supplier, Warehouse, CarMake, CarModel
 from .fitment import verify_product_fitment
 from .cross_reference import get_product_cross_references, parse_alternate_numbers
-from sales.models import SaleItem
 
 
 SORT_FIELDS = {
@@ -83,9 +82,15 @@ def product_list(request):
 
     stock_filter = request.GET.get("stock", "")
     if stock_filter == "low":
-        products = products.filter(quantity__lte=Product.LOW_STOCK_THRESHOLD)
+        products = products.filter(
+            Q(reorder_level__gt=0, quantity__lte=F("reorder_level"))
+            | Q(reorder_level=0, quantity__lte=Product.LOW_STOCK_THRESHOLD)
+        )
     elif stock_filter == "ok":
-        products = products.filter(quantity__gt=Product.LOW_STOCK_THRESHOLD)
+        products = products.filter(
+            Q(reorder_level__gt=0, quantity__gt=F("reorder_level"))
+            | Q(reorder_level=0, quantity__gt=Product.LOW_STOCK_THRESHOLD)
+        )
     elif stock_filter == "out":
         products = products.filter(quantity=0)
 
@@ -138,6 +143,34 @@ def product_list(request):
         "active_make": active_make,
         "active_model": active_model,
         "per_page": per_page,
+    })
+
+
+@login_required
+def reorder_suggestions(request):
+    """List products at or below their reorder point with a suggested top-up quantity."""
+    low_stock_filter = (
+        Q(reorder_level__gt=0, quantity__lte=F("reorder_level"))
+        | Q(reorder_level=0, quantity__lte=Product.LOW_STOCK_THRESHOLD)
+    )
+    products = (
+        Product.objects.select_related("category")
+        .filter(low_stock_filter)
+        .annotate(
+            reorder_target=Case(
+                When(reorder_level__gt=0, then=F("reorder_level")),
+                default=Value(Product.LOW_STOCK_THRESHOLD),
+                output_field=IntegerField(),
+            )
+        )
+        .annotate(suggested_order_quantity=F("reorder_target") - F("quantity"))
+        .order_by("quantity", "name")
+    )
+    page = Paginator(products, 50).get_page(request.GET.get("page"))
+    return render(request, "inventory/reorder_suggestions.html", {
+        "products": page,
+        "page": page,
+        "total_products": page.paginator.count,
     })
 
 
@@ -212,7 +245,7 @@ def verify_fitment_api(request):
 
 @login_required
 def export_inventory(request):
-    """Export products to Excel in the inventory-table format."""
+    """Export the editable product fields and the lookup lists used by product forms."""
     products = Product.objects.select_related("category").prefetch_related("compatibilities__make")
 
     # Apply same filters as product_list for consistency
@@ -246,9 +279,15 @@ def export_inventory(request):
         products = products.filter(brand__iexact=brand_filter)
     stock_filter = request.GET.get("stock", "")
     if stock_filter == "low":
-        products = products.filter(quantity__lte=Product.LOW_STOCK_THRESHOLD)
+        products = products.filter(
+            Q(reorder_level__gt=0, quantity__lte=F("reorder_level"))
+            | Q(reorder_level=0, quantity__lte=Product.LOW_STOCK_THRESHOLD)
+        )
     elif stock_filter == "ok":
-        products = products.filter(quantity__gt=Product.LOW_STOCK_THRESHOLD)
+        products = products.filter(
+            Q(reorder_level__gt=0, quantity__gt=F("reorder_level"))
+            | Q(reorder_level=0, quantity__gt=Product.LOW_STOCK_THRESHOLD)
+        )
 
     products = products.order_by("name")
 
@@ -257,30 +296,26 @@ def export_inventory(request):
     ws.title = "Inventory"
 
     headers = [
-        "Product ID",
+        "Part Number",
         "SKU",
         "Product Name",
-        "LOCATION",
-        "Category",
         "Brand",
-        "Car Brand",
-        "Car Model",
-        "Chassis Prefixes",
-        "Supplier",
-        "Unit",
-        "Opening Stock",
-        "Purchase",
-        "Sales",
-        "Available Stock",
-        "Minimum Stock",
-        "Stock Status",
+        "Manufacturer / Origin",
+        "Genuine OEM",
+        "Category",
+        "Unit of Measure",
         "Cost Price",
         "Selling Price",
-        "Inventory Value",
-        "Gross Profit per Unit",
-        "Estimated Profit",
-        "Last Purchase Date",
-        "Remarks",
+        "Wholesale Price",
+        "Stock Quantity",
+        "Minimum Stock",
+        "Storage Location",
+        "Shelf / Bin",
+        "Purpose",
+        "Vehicle Application",
+        "Alternate Part Numbers",
+        "Car Brand",
+        "Car Model",
     ]
     for col, header in enumerate(headers, 1):
         ws.cell(row=1, column=col, value=header)
@@ -291,75 +326,35 @@ def export_inventory(request):
         cell.font = header_font
         cell.alignment = Alignment(horizontal="center", vertical="center")
     ws.freeze_panes = "A2"
-    ws.auto_filter.ref = f"A1:{get_column_letter(len(headers))}{ws.max_row}"
-
     for row, product in enumerate(products, 2):
-        purchase_quantity = sum(
-            item.quantity
-            for item in PurchaseItem.objects.filter(product=product)
+        compatible_models = sorted(
+            product.compatibilities.select_related("make").all(),
+            key=lambda model: (model.make.name.casefold(), model.name.casefold()),
         )
-        sales_quantity = sum(
-            item.quantity
-            for item in SaleItem.objects.filter(product=product)
-        )
-        latest_purchase = (
-            Purchase.objects.filter(items__product=product)
-            .select_related("supplier")
-            .order_by("-date")
-            .first()
-        )
-        last_purchase = (
-            Purchase.objects.filter(items__product=product)
-            .order_by("-date")
-            .values_list("date", flat=True)
-            .first()
-        )
-
-        opening_stock = max(0, product.quantity - purchase_quantity + sales_quantity)
-        inventory_value = product.quantity * product.cost_price
-        gross_profit = product.selling_price - product.cost_price
-        estimated_profit = gross_profit * product.quantity
-        stock_status = "Out of Stock" if product.quantity == 0 else (
-            "Low Stock" if product.quantity <= product.reorder_level else "In Stock"
-        )
-        compatible_models = list(product.compatibilities.select_related("make").all())
-        car_brands = sorted({model.make.name for model in compatible_models})
-        car_models = sorted({
-            f"{model.make.name} {model.name}"
-            for model in compatible_models
-        })
-        chassis_prefixes = sorted({
-            prefix.strip()
-            for model in compatible_models
-            for prefix in (model.chassis_prefixes or "").split(",")
-            if prefix.strip()
-        })
+        car_brands = [model.make.name for model in compatible_models]
+        car_models = [str(model) for model in compatible_models]
 
         values = [
-            product.id,
+            product.part_number or "",
             product.sku or "",
             product.name,
-            product.location or "",
-            product.category.name if product.category else "",
             product.brand or "",
-            " | ".join(car_brands),
-            " | ".join(car_models),
-            " | ".join(chassis_prefixes),
-            latest_purchase.supplier.name if latest_purchase and latest_purchase.supplier else "",
-            product.uom_short,
-            opening_stock,
-            purchase_quantity,
-            sales_quantity,
-            product.quantity,
-            product.reorder_level,
-            stock_status,
+            product.manufacturer_brand or "",
+            product.is_genuine,
+            product.category.name if product.category else "",
+            product.unit_of_measure,
             float(product.cost_price),
             float(product.selling_price),
-            float(inventory_value),
-            float(gross_profit),
-            float(estimated_profit),
-            last_purchase.date() if last_purchase else "",
+            float(product.wholesale_price),
+            product.quantity,
+            product.reorder_level,
+            product.location or "",
+            product.shelf_bin or "",
             product.purpose or "",
+            product.vehicle_application or "",
+            product.alternate_numbers or "",
+            " | ".join(car_brands),
+            " | ".join(car_models),
         ]
         for col, value in enumerate(values, 1):
             ws.cell(row=row, column=col, value=value)
@@ -367,10 +362,9 @@ def export_inventory(request):
     for col in range(1, len(headers) + 1):
         ws.column_dimensions[get_column_letter(col)].width = 18
     ws.column_dimensions["C"].width = 32
-    ws.column_dimensions["D"].width = 24
-    ws.column_dimensions["G"].width = 24
-    ws.column_dimensions["H"].width = 32
-    ws.column_dimensions["I"].width = 28
+    ws.column_dimensions["E"].width = 24
+    ws.column_dimensions["Q"].width = 32
+    ws.auto_filter.ref = ws.dimensions
 
     categories_ws = wb.create_sheet("Categories")
     categories_ws.append(["Category"])
@@ -436,18 +430,87 @@ def import_inventory(request):
 
     try:
         wb = load_workbook(excel_file, read_only=True, data_only=True)
-        ws = wb.active
+        ws = wb["Inventory"] if "Inventory" in wb.sheetnames else wb.active
+
+        if "Categories" in wb.sheetnames:
+            for row in wb["Categories"].iter_rows(min_row=2, values_only=True):
+                category_name = str(row[0] or "").strip() if row else ""
+                if category_name:
+                    Category.objects.get_or_create(name=category_name[:100])
+
+        if "Car Brands" in wb.sheetnames:
+            for row in wb["Car Brands"].iter_rows(min_row=2, values_only=True):
+                make_name = str(row[0] or "").strip() if row else ""
+                if make_name:
+                    CarMake.objects.get_or_create(name=make_name[:100])
+
+        if "Car Models" in wb.sheetnames:
+            car_models_ws = wb["Car Models"]
+            car_model_headers = {
+                " ".join(str(value).strip().casefold().split()): index
+                for index, value in enumerate(next(
+                    car_models_ws.iter_rows(min_row=1, max_row=1, values_only=True), ()
+                ))
+                if value is not None and str(value).strip()
+            }
+            for row in car_models_ws.iter_rows(min_row=2, values_only=True):
+                def lookup_value(*names):
+                    for name in names:
+                        index = car_model_headers.get(name.casefold())
+                        if index is not None and index < len(row):
+                            return row[index]
+                    return None
+
+                make_name = str(lookup_value("car brand", "make", "brand") or "").strip()
+                model_name = str(lookup_value("car model", "model", "name") or "").strip()
+                if not make_name or not model_name:
+                    continue
+                make, _ = CarMake.objects.get_or_create(name=make_name[:100])
+                year_from = lookup_value("year from")
+                year_to = lookup_value("year to")
+                try:
+                    year_from = int(year_from) if year_from not in (None, "") else None
+                    year_to = int(year_to) if year_to not in (None, "") else None
+                except (TypeError, ValueError):
+                    continue
+                model_query = CarModel.objects.filter(make=make, name=model_name[:100])
+                if year_from is None:
+                    model_query = model_query.filter(year_from__isnull=True)
+                else:
+                    model_query = model_query.filter(year_from=year_from)
+                if year_to is None:
+                    model_query = model_query.filter(year_to__isnull=True)
+                else:
+                    model_query = model_query.filter(year_to=year_to)
+                model = model_query.first()
+                model_defaults = {
+                    "year_from": year_from,
+                    "year_to": year_to,
+                    "engine_type": str(lookup_value("engine") or "")[:100],
+                    "chassis_prefixes": str(lookup_value("chassis prefixes") or "")[:200],
+                }
+                if model:
+                    for field, value in model_defaults.items():
+                        setattr(model, field, value)
+                    model.save()
+                else:
+                    CarModel.objects.create(
+                        make=make,
+                        name=model_name[:100],
+                        **model_defaults,
+                    )
+
         first_row = next(ws.iter_rows(min_row=1, max_row=1, values_only=True), ())
         first_cell = str(first_row[0] or "").upper() if first_row else ""
         header_columns = {
-            str(value).strip().casefold(): index
+            " ".join(str(value).strip().casefold().split()): index
             for index, value in enumerate(first_row)
             if value is not None and str(value).strip()
         }
 
         def column_value(row, names, fallback_index=None):
             for name in names:
-                index = header_columns.get(name)
+                index = header_columns.get(" ".join(name.strip().casefold().split()))
                 if index is not None and index < len(row):
                     return row[index]
             if fallback_index is not None and fallback_index < len(row):
@@ -457,21 +520,26 @@ def import_inventory(request):
         # Detect format: "PART NAME" in header = spare parts format (INVENTORY.xlsx)
         is_spare_parts_format = first_cell and "PART NAME" in first_cell
 
-        created = 0
+        imported = 0
         errors = []
-        start_row = 2
 
-        for row_num, row in enumerate(ws.iter_rows(min_row=start_row, values_only=True), start_row):
+        for row_num, row in enumerate(ws.iter_rows(min_row=2, values_only=True), 2):
             if not row or not any(row):
                 continue
 
             sku_value = None
+            manufacturer = ""
+            is_genuine = True
             unit = "PCS"
+            cost_price = 0
+            wholesale_price = 0
             reorder_level = 0
+            shelf_bin = ""
+            alternate_numbers = ""
+            car_brand_value = ""
+            car_model_value = ""
 
             if is_spare_parts_format:
-                # Spare parts format: A=PART NAME, B=PART NUMBER, E=QTY, F=INSIDE PART NUMBER,
-                # G=MARK (brand), H=TYPE (category), I=PURPOSE, J=FOR WHAT CAR
                 name = str(row[0] or "").strip() if row[0] is not None else ""
                 part_num_col_b = row[1]
                 qty = row[4] if len(row) > 4 else None
@@ -489,59 +557,99 @@ def import_inventory(request):
                     continue
 
                 part_number = inside_part or str(part_num_col_b or "").strip()
-                quantity = int(qty or 0) if qty is not None else 0
+                sku_value = None
+                manufacturer = ""
+                is_genuine = True
+                unit = "PCS"
+                cost_price = 0
+                wholesale_price = 0
+                reorder_level = 0
+                shelf_bin = ""
+                alternate_numbers = ""
+                quantity = qty or 0
                 category_name = type_name
-                vehicle_application = car_used
-                location = ""  # Physical storage - set manually
-                cost_price = 0.0
-                selling_price = 0.0  # Not in spare parts file - set in Admin after import
+                vehicle_app = car_used
+                location = ""
+                purpose_val = purpose
+                selling_price = 0
             else:
-                # Standard format: Part Number, Name, Brand, Category, Qty, Cost, Price, Location, Purpose, Vehicle
                 part_number_value = column_value(row, ("part number", "part #", "part no"))
-                name_value = column_value(row, ("product name", "name", "part name"), 2)
-                if name_value is None:
-                    name_value = column_value(row, ("name", "part name"), 1)
-                sku_value = column_value(row, ("sku", "product id"))
+                name_value = column_value(row, ("product name", "name", "part name"), 1)
+                sku_value = column_value(row, ("sku",))
                 part_number = str(part_number_value or "").strip()
                 name = str(name_value or "").strip()
                 if not name:
                     errors.append(f"Row {row_num}: Name is required.")
                     continue
-                brand_value = column_value(row, ("brand", "mark"), 5)
-                category_value = column_value(row, ("category", "type"), 4)
-                quantity_value = column_value(row, ("available stock", "quantity", "qty", "stock"), 11)
-                cost_value = column_value(row, ("cost price", "cost"), 14)
-                selling_price_value = column_value(row, ("selling price", "price"), 15)
-                location_value = column_value(row, ("location", "storage location"), 3)
-                purpose_value = column_value(row, ("remarks", "purpose"))
-                vehicle_value = column_value(
-                    row,
-                    ("car model", "vehicle/car types / chassis", "vehicle", "vehicle application", "car types"),
+                def value(*names, fallback=None):
+                    return column_value(row, names, fallback)
+
+                brand = str(value("brand", "mark", fallback=2) or "").strip()
+                manufacturer = str(value("manufacturer / origin", "manufacturer", "origin") or "").strip()
+                genuine_value = value("genuine oem", "genuine", "is genuine")
+                if isinstance(genuine_value, str):
+                    is_genuine = genuine_value.strip().casefold() in {"yes", "true", "1", "genuine"}
+                else:
+                    is_genuine = bool(genuine_value) if genuine_value is not None else True
+                category_name = str(value("category", "type", fallback=3) or "").strip()
+                unit = str(value("unit of measure", "unit") or "PCS").strip().upper()
+                if unit not in dict(Product.UOM_CHOICES):
+                    unit_label_to_code = {
+                        label.casefold(): code for code, label in Product.UOM_CHOICES
+                    }
+                    unit = unit_label_to_code.get(unit.casefold(), "PCS")
+
+                quantity_value = value(
+                    "stock quantity", "available stock", "quantity", "qty", "stock", fallback=4
                 )
-                car_brand_value = column_value(row, ("car brand",))
-                chassis_value = column_value(row, ("chassis prefixes",))
-                unit_value = column_value(row, ("unit", "unit of measure"))
-                reorder_value = column_value(row, ("minimum stock", "reorder level"))
-                brand = str(brand_value or "").strip()
-                category_name = str(category_value or "").strip()
-                quantity = int(quantity_value or 0)
-                cost_price = float(cost_value or 0)
-                selling_price = float(selling_price_value or 0)
+                reorder_value = value("minimum stock", "reorder level")
+                cost_value = value("cost price", "cost")
+                selling_price_value = value("selling price", "price", fallback=5)
+                wholesale_value = value("wholesale price",)
+                location_value = value("storage location", "location", fallback=6)
+                shelf_bin_value = value("shelf / bin", "shelf/bin", "shelf bin")
+                purpose_value = value("purpose", "remarks")
+                vehicle_value = value(
+                    "vehicle application",
+                    "vehicle/car types / chassis",
+                    "vehicle",
+                    "car types",
+                )
+                car_brand_value = value("car brand",)
+                car_model_value = value("car model",)
+                alternate_value = value("alternate part numbers", "alternate numbers", "cross reference")
+
+                def number(raw_value, field_name, default=0, integer=False):
+                    if raw_value in (None, ""):
+                        return default
+                    try:
+                        parsed = float(raw_value)
+                        if parsed < 0 or (integer and not parsed.is_integer()):
+                            raise ValueError
+                        return int(parsed) if integer else parsed
+                    except (TypeError, ValueError):
+                        raise ValueError(f"Row {row_num}: {field_name} must be a non-negative {'whole number' if integer else 'number'}.")
+
+                try:
+                    quantity = number(quantity_value, "Stock Quantity", integer=True)
+                    reorder_level = number(reorder_value, "Minimum Stock", integer=True)
+                    cost_price = number(cost_value, "Cost Price")
+                    selling_price = number(selling_price_value, "Selling Price")
+                    wholesale_price = number(wholesale_value, "Wholesale Price")
+                except ValueError as exc:
+                    errors.append(str(exc))
+                    continue
+                brand = brand[:50]
+                category_name = category_name[:100]
                 location = str(location_value or "").strip()
+                shelf_bin = str(shelf_bin_value or "").strip()
                 purpose_val = str(purpose_value or "").strip()
                 vehicle_app = str(vehicle_value or "").strip()
-                unit = str(unit_value or "PCS").strip().upper()
-                if unit not in dict(Product.UOM_CHOICES):
-                    unit = "PCS"
-                reorder_level = int(reorder_value or 0)
+                alternate_numbers = str(alternate_value or "").strip()
 
             category = None
             if category_name:
                 category, _ = Category.objects.get_or_create(name=category_name)
-
-            if is_spare_parts_format:
-                purpose_val = purpose
-                vehicle_app = vehicle_application
 
             imported_sku = str(sku_value or "").strip()[:50] if sku_value is not None else ""
             product = None
@@ -550,65 +658,93 @@ def import_inventory(request):
             if product is None and part_number:
                 product = Product.objects.filter(part_number=part_number).first()
 
+            conflicting_sku = Product.objects.filter(sku=imported_sku)
+            if imported_sku and product:
+                conflicting_sku = conflicting_sku.exclude(pk=product.pk)
+            if imported_sku and conflicting_sku.exists():
+                errors.append(f"Row {row_num}: SKU '{imported_sku}' already belongs to another product.")
+                continue
+
             product_values = {
                 "part_number": part_number[:50],
                 "name": name[:100],
-                "brand": brand[:50] if brand else "",
+                "brand": brand[:50],
+                "manufacturer_brand": manufacturer[:100],
+                "is_genuine": is_genuine,
                 "category": category,
-                "unit_of_measure": unit if not is_spare_parts_format else "PCS",
+                "unit_of_measure": unit,
                 "quantity": max(0, quantity),
                 "reorder_level": max(0, reorder_level),
                 "cost_price": max(0, cost_price),
                 "selling_price": max(0, selling_price),
+                "wholesale_price": max(0, wholesale_price),
                 "location": location[:150] if location else "",
+                "shelf_bin": shelf_bin[:50],
                 "purpose": purpose_val[:150] if purpose_val else "",
                 "vehicle_application": vehicle_app[:500] if vehicle_app else "",
+                "alternate_numbers": alternate_numbers[:255],
             }
             if product:
+                if not is_spare_parts_format:
+                    optional_headers = {
+                        "part_number": ("part number", "part #", "part no"),
+                        "manufacturer_brand": ("manufacturer / origin", "manufacturer", "origin"),
+                        "is_genuine": ("genuine oem", "genuine", "is genuine"),
+                        "unit_of_measure": ("unit of measure", "unit"),
+                        "cost_price": ("cost price", "cost"),
+                        "selling_price": ("selling price", "price"),
+                        "wholesale_price": ("wholesale price",),
+                        "reorder_level": ("minimum stock", "reorder level"),
+                        "shelf_bin": ("shelf / bin", "shelf/bin", "shelf bin"),
+                        "alternate_numbers": ("alternate part numbers", "alternate numbers", "cross reference"),
+                    }
+                    for field, aliases in optional_headers.items():
+                        if not any(
+                            " ".join(alias.casefold().split()) in header_columns
+                            for alias in aliases
+                        ):
+                            product_values.pop(field)
                 for field, value in product_values.items():
                     setattr(product, field, value)
+                if imported_sku:
+                    product.sku = imported_sku
                 product.save()
             else:
                 product = Product.objects.create(
                     sku=imported_sku or ProductForm.generate_unique_sku(part_number),
                     **product_values,
                 )
-            if not is_spare_parts_format:
-                compatibility_models = []
-                car_brand_names = [
-                    value.strip()
-                    for value in str(car_brand_value or "").split("|")
-                    if value.strip()
-                ]
-                car_model_names = [
-                    value.strip()
-                    for value in str(vehicle_app or "").split("|")
-                    if value.strip()
-                ]
-                for model_name in car_model_names:
-                    model_name_parts = model_name.split()
-                    matching_make_name = next(
-                        (name for name in car_brand_names if model_name.startswith(name)),
-                        car_brand_names[0] if car_brand_names else "",
+            compatibility_models = []
+            car_brand_names = [value.strip() for value in str(car_brand_value or "").split("|") if value.strip()]
+            car_model_names = [value.strip() for value in str(car_model_value or "").split("|") if value.strip()]
+            for model_index, model_name in enumerate(car_model_names):
+                make_name = car_brand_names[min(model_index, len(car_brand_names) - 1)] if car_brand_names else ""
+                model_query = CarModel.objects.select_related("make").all()
+                if make_name:
+                    model_query = model_query.filter(make__name__iexact=make_name)
+                model = next(
+                    (
+                        candidate for candidate in model_query
+                        if candidate.name.casefold() == model_name.casefold()
+                        or str(candidate).casefold() == model_name.casefold()
+                    ),
+                    None,
+                )
+                if not model:
+                    errors.append(
+                        f"Row {row_num}: Car model '{model_name}'"
+                        f"{f' for {make_name}' if make_name else ''} was not found in the Car Models list."
                     )
-                    make = CarMake.objects.filter(name__iexact=matching_make_name).first() if matching_make_name else None
-                    if make:
-                        model_label = model_name[len(matching_make_name):].strip()
-                    else:
-                        model_label = model_name
-                        make = None
-                    if model_label:
-                        model = CarModel.objects.filter(make=make, name__iexact=model_label).first() if make else None
-                        if model:
-                            compatibility_models.append(model)
-                if compatibility_models:
-                    product.compatibilities.set(compatibility_models)
-            created += 1
+                    continue
+                compatibility_models.append(model)
+            if compatibility_models or car_model_names:
+                product.compatibilities.set(compatibility_models)
+            imported += 1
 
         wb.close()
 
         return render(request, "inventory/import_inventory.html", {
-            "success": f"Successfully imported {created} product(s).",
+            "success": f"Successfully imported or updated {imported} product(s).",
             "errors": errors if errors else None,
         })
 

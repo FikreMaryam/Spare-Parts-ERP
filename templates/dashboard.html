@@ -43,7 +43,7 @@
         <div class="stat-value">{{ stats.total_inventory_value|floatformat:2 }} <span class="text-muted" style="font-size:0.75rem;font-weight:600">ETB</span></div>
         <div class="kpi-note">{{ stats.total_products }} {{ ui.registered_parts|default:"registered parts" }}</div>
     </div>
-    <a href="{% url 'product_list' %}?stock=low" class="card stat-card dashboard-kpi dashboard-kpi-link{% if stats.low_stock_count > 0 %} dashboard-kpi-warning{% endif %}" style="text-decoration:none">
+    <a href="{% url 'reorder_suggestions' %}" class="card stat-card dashboard-kpi dashboard-kpi-link{% if stats.low_stock_count > 0 %} dashboard-kpi-warning{% endif %}" style="text-decoration:none">
         <div class="stat-label">{{ ui.low_stock|default:"Low stock" }}</div>
         <div class="stat-value {% if stats.low_stock_count > 0 %}text-error{% endif %}">{{ stats.low_stock_count }}</div>
         <div class="kpi-note">{{ ui.below_reorder_threshold|default:"Below reorder threshold" }}</div>

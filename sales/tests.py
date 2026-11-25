@@ -1,10 +1,127 @@
 from django.test import TestCase
 from django.urls import reverse
 from decimal import Decimal
+from django.contrib.auth import get_user_model
 
 from inventory.models import CarMake, CarModel, Product
 from reports.models import BusinessProfile
 from .models import Customer, Proforma, Sale, SaleItem
+
+
+class CustomerManagementTests(TestCase):
+    def setUp(self):
+        self.user = get_user_model().objects.create_superuser(
+            username="customer-admin",
+            email="admin@example.com",
+            password="test-password",
+        )
+        self.client.force_login(self.user)
+
+    def test_customer_form_includes_company_and_tax_details(self):
+        response = self.client.get(reverse("customer_create"))
+
+        self.assertEqual(response.status_code, 200)
+        for field in (
+            "company_name",
+            "tin_number",
+            "vat_number",
+            "phone",
+            "email",
+            "address",
+            "credit_limit",
+        ):
+            self.assertContains(response, f'name="{field}"')
+
+    def test_create_and_update_customer_company_details(self):
+        response = self.client.post(
+            reverse("customer_create"),
+            {
+                "name": "Alemu Bekele",
+                "company_name": "Alemu Auto Garage",
+                "tin_number": "0012345678",
+                "vat_number": "VAT-12345",
+                "phone": "+251911000000",
+                "email": "garage@example.com",
+                "address": "Addis Ababa",
+                "credit_limit": "25000.00",
+            },
+        )
+
+        self.assertRedirects(response, reverse("customer_list"))
+        customer = Customer.objects.get(tin_number="0012345678")
+        self.assertEqual(customer.company_name, "Alemu Auto Garage")
+        self.assertEqual(customer.vat_number, "VAT-12345")
+        self.assertEqual(customer.credit_limit, Decimal("25000.00"))
+
+        response = self.client.post(
+            reverse("customer_update", args=[customer.pk]),
+            {
+                "name": "Alemu Bekele",
+                "company_name": "Alemu Auto Parts",
+                "tin_number": "0098765432",
+                "vat_number": "",
+                "phone": "+251911000000",
+                "email": "garage@example.com",
+                "address": "Addis Ababa",
+                "credit_limit": "30000.00",
+            },
+        )
+
+        self.assertRedirects(response, reverse("customer_list"))
+        customer.refresh_from_db()
+        self.assertEqual(customer.company_name, "Alemu Auto Parts")
+        self.assertEqual(customer.tin_number, "0098765432")
+        self.assertEqual(customer.credit_limit, Decimal("30000.00"))
+
+    def test_customer_credit_limit_cannot_be_negative(self):
+        response = self.client.post(
+            reverse("customer_create"),
+            {
+                "name": "Test Customer",
+                "credit_limit": "-1",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(Customer.objects.exists())
+        self.assertContains(response, "Credit limit cannot be negative.")
+
+    def test_customer_list_searches_business_fields(self):
+        Customer.objects.create(
+            name="Mekdes Abebe",
+            company_name="Mekdes Auto Parts",
+            tin_number="TIN-7788",
+            phone="0911778899",
+            email="mekdes@example.com",
+        )
+        Customer.objects.create(name="Other Customer", tin_number="TIN-1122")
+
+        for query in ("Mekdes", "Auto Parts", "TIN-7788", "0911778899", "mekdes@example.com"):
+            with self.subTest(query=query):
+                response = self.client.get(reverse("customer_list"), {"q": query})
+                self.assertEqual(response.status_code, 200)
+                self.assertEqual(response.context["page"].paginator.count, 1)
+                self.assertContains(response, "Mekdes Auto Parts")
+                self.assertNotContains(response, "Other Customer")
+
+    def test_customer_list_is_paginated_and_shows_company_contact_correctly(self):
+        company_customer = Customer.objects.create(
+            name="Contact Person",
+            company_name="Parts Company",
+            tin_number="TIN-9000",
+        )
+        for index in range(26):
+            Customer.objects.create(name=f"Customer {index:02d}")
+
+        response = self.client.get(reverse("customer_list"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["page"].paginator.count, 27)
+        self.assertEqual(len(response.context["customers"]), 25)
+        self.assertContains(response, "Page 1 of 2")
+        self.assertContains(response, "Parts Company")
+        self.assertContains(response, "Contact Person")
+        self.assertContains(response, reverse("customer_detail", args=[company_customer.pk]))
 
 
 class POSChassisSearchTests(TestCase):
@@ -96,4 +213,3 @@ class POSChassisSearchTests(TestCase):
             "payment_method": "CASH",
         })
         self.assertIn(resp.status_code, [200, 302])
-

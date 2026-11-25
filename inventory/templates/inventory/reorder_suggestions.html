@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+
+{% block title %}Reorder Suggestions - {{ app_name }}{% endblock %}
+{% block page_title %}Reorder Suggestions{% endblock %}
+
+{% block content %}
+<div class="header-actions" style="margin-bottom: 1rem;">
+    <a href="{% url 'product_list' %}?stock=low" class="btn btn-secondary">View low-stock inventory</a>
+    <a href="{% url 'purchase_add' %}" class="btn">Record Purchase</a>
+</div>
+
+<div class="card table-card">
+    <div class="card-header">
+        <span class="text-muted">{{ total_products }} product{{ total_products|pluralize }} at or below its reorder point</span>
+    </div>
+    <div class="table-container">
+        <table class="sortable-table">
+            <thead>
+                <tr>
+                    <th>Part Number</th>
+                    <th>Product</th>
+                    <th>Category</th>
+                    <th>Available</th>
+                    <th>Reorder Point</th>
+                    <th>Suggested Top-up</th>
+                    <th>Location</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for product in products %}
+                <tr>
+                    <td>{{ product.part_number|default:"—" }}</td>
+                    <td><a href="{% url 'product_detail' product.pk %}">{{ product.name }}</a></td>
+                    <td>{{ product.category.name|default:"—" }}</td>
+                    <td>{{ product.quantity }} {{ product.uom_short }}</td>
+                    <td>{{ product.reorder_target }} {{ product.uom_short }}</td>
+                    <td><strong>{{ product.suggested_order_quantity }} {{ product.uom_short }}</strong></td>
+                    <td>{{ product.location|default:"—" }}</td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="7" class="empty-state">No products currently need reordering.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% if page.has_other_pages %}
+    <nav class="pagination" aria-label="Reorder suggestion pages">
+        {% if page.has_previous %}<a href="?page={{ page.previous_page_number }}" class="btn btn-secondary">← Previous</a>{% endif %}
+        <span class="page-info">Page {{ page.number }} of {{ page.paginator.num_pages }}</span>
+        {% if page.has_next %}<a href="?page={{ page.next_page_number }}" class="btn btn-secondary">Next →</a>{% endif %}
+    </nav>
+    {% endif %}
+</div>
+{% endblock %}

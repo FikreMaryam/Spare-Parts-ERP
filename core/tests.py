@@ -25,6 +25,7 @@ class DashboardTests(TestCase):
             sku="LOW-STOCK",
             name="Low stock item",
             quantity=3,
+            reorder_level=5,
             cost_price=10,
             selling_price=20,
         )
@@ -32,6 +33,7 @@ class DashboardTests(TestCase):
             sku="IN-STOCK",
             name="In stock item",
             quantity=8,
+            reorder_level=5,
             cost_price=5,
             selling_price=10,
         )

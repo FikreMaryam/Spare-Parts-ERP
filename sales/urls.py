@@ -1,5 +1,5 @@
 from django.urls import path
-from . import views, crud_views, views_proforma, views_payments
+from . import views, crud_views, views_proforma, views_payments, customer_io
 
 urlpatterns = [
     path("pos/", views.pos_view, name="pos"),
@@ -12,6 +12,8 @@ urlpatterns = [
     path("invoice/pdf/<int:sale_id>/", views.invoice_pdf, name="invoice_pdf"),
     path("report/", views.sales_report, name="sales_report"),
     path("customers/", views.customer_list, name="customer_list"),
+    path("customers/export/", customer_io.customer_export, name="customer_export"),
+    path("customers/import/", customer_io.customer_import, name="customer_import"),
     path("customers/<int:pk>/", views.customer_detail, name="customer_detail"),
     path("customers/<int:pk>/vehicles/add/", views.customer_add_vehicle, name="customer_add_vehicle"),
     path("customers/<int:pk>/vehicles/<int:vehicle_id>/delete/", views.customer_delete_vehicle, name="customer_delete_vehicle"),

@@ -65,17 +65,57 @@ class InventoryExcelImportTests(TestCase):
         self.assertEqual(product.selling_price, 8.5)
         self.assertEqual(product.location, "B-2")
 
-    def test_exports_full_inventory_table_format(self):
+    def test_imports_product_form_fields_and_vehicle_compatibility(self):
+        make = CarMake.objects.create(name="Toyota")
+        model = CarModel.objects.create(
+            make=make,
+            name="Corolla",
+            year_from=2019,
+            year_to=2024,
+            chassis_prefixes="NRE210",
+        )
+        response = self._import_workbook(
+            [
+                "Part Number", "SKU", "Product Name", "Brand", "Manufacturer / Origin",
+                "Genuine OEM", "Category", "Unit of Measure", "Cost Price",
+                "Selling Price", "Wholesale Price", "Stock Quantity", "Minimum Stock",
+                "Storage Location", "Shelf / Bin", "Purpose", "Vehicle Application",
+                "Alternate Part Numbers", "Car Brand", "Car Model",
+            ],
+            [
+                "P-250", "SKU-P250", "Water Pump", "Denso", "Japan", False,
+                "Cooling", "PCS", 100, 150, 130, 8, 2, "A-1", "A-01-02",
+                "Engine cooling", "Corolla", "WP-250A", "Toyota", "Corolla",
+            ],
+        )
+
+        self.assertEqual(response.status_code, 200)
+        product = Product.objects.get(sku="SKU-P250")
+        self.assertEqual(product.part_number, "P-250")
+        self.assertEqual(product.manufacturer_brand, "Japan")
+        self.assertFalse(product.is_genuine)
+        self.assertEqual(product.category.name, "Cooling")
+        self.assertEqual(product.unit_of_measure, "PCS")
+        self.assertEqual(product.wholesale_price, 130)
+        self.assertEqual(product.shelf_bin, "A-01-02")
+        self.assertEqual(product.alternate_numbers, "WP-250A")
+        self.assertEqual(list(product.compatibilities.all()), [model])
+
+    def test_exports_product_form_fields_and_lookup_lists(self):
         product = Product.objects.create(
             sku="INV-001",
             part_number="P-400",
             name="Clutch Kit",
             brand="Sachs",
+            manufacturer_brand="Japan",
             quantity=12,
             reorder_level=3,
             cost_price=40,
             selling_price=70,
+            wholesale_price=55,
             location="A-12",
+            shelf_bin="A-12-01",
+            alternate_numbers="CK-400A",
         )
         make = CarMake.objects.create(name="Toyota")
         model = CarModel.objects.create(
@@ -93,30 +133,48 @@ class InventoryExcelImportTests(TestCase):
         response = self.client.get(reverse("export_inventory"))
 
         self.assertEqual(response.status_code, 200)
-        workbook = Workbook()
         from openpyxl import load_workbook
         exported = load_workbook(BytesIO(response.content), read_only=True)
         worksheet = exported.active
         headers = [cell.value for cell in worksheet[1]]
-        self.assertIn("Product ID", headers)
-        self.assertIn("Available Stock", headers)
-        self.assertIn("Gross Profit per Unit", headers)
+        self.assertIn("Part Number", headers)
+        self.assertIn("Manufacturer / Origin", headers)
+        self.assertIn("Wholesale Price", headers)
+        self.assertIn("Shelf / Bin", headers)
+        self.assertNotIn("Inventory Value", headers)
+        self.assertNotIn("Supplier", headers)
         self.assertIn("Car Brand", headers)
         self.assertIn("Car Model", headers)
-        self.assertIn("Chassis Prefixes", headers)
+        self.assertNotIn("Chassis Prefixes", headers)
         row = next(
             row for row in worksheet.iter_rows(min_row=2, values_only=True)
             if row[1] == product.sku
         )
+        self.assertEqual(row[0], "P-400")
         self.assertEqual(row[2], "Clutch Kit")
+        self.assertEqual(row[4], "Japan")
         self.assertEqual(row[11], 12)
-        self.assertEqual(row[6], "Toyota")
-        self.assertEqual(row[7], "Toyota Corolla")
-        self.assertEqual(row[8], "NRE210")
+        self.assertEqual(row[18], "Toyota")
+        self.assertEqual(row[19], "Toyota Corolla 2019-2024")
         self.assertIn("Categories", exported.sheetnames)
         self.assertIn("Brands", exported.sheetnames)
         self.assertIn("Car Brands", exported.sheetnames)
         self.assertIn("Car Models", exported.sheetnames)
+        car_models_sheet = exported["Car Models"]
+        self.assertEqual(car_models_sheet["F2"].value, "NRE210")
+
+        product.delete()
+        upload = SimpleUploadedFile("inventory.xlsx", response.content)
+        import_response = self.client.post(reverse("import_inventory"), {"file": upload})
+        self.assertEqual(import_response.status_code, 200)
+
+        restored = Product.objects.get(sku="INV-001")
+        self.assertEqual(restored.part_number, "P-400")
+        self.assertEqual(restored.manufacturer_brand, "Japan")
+        self.assertEqual(restored.wholesale_price, 55)
+        self.assertEqual(restored.shelf_bin, "A-12-01")
+        self.assertEqual(restored.alternate_numbers, "CK-400A")
+        self.assertEqual(list(restored.compatibilities.all()), [model])
 
     def test_imports_multiple_products_with_unique_skus(self):
         workbook = Workbook()
@@ -135,6 +193,45 @@ class InventoryExcelImportTests(TestCase):
         skus = list(Product.objects.filter(part_number__in=["P-300", "P-301"]).values_list("sku", flat=True))
         self.assertTrue(all(skus))
         self.assertEqual(len(set(skus)), 2)
+
+    def test_reorder_suggestions_use_product_reorder_level(self):
+        low_product = Product.objects.create(
+            sku="REORDER-LOW",
+            name="Low at custom threshold",
+            quantity=7,
+            reorder_level=10,
+            selling_price=20,
+        )
+        Product.objects.create(
+            sku="REORDER-OK",
+            name="Above custom threshold",
+            quantity=8,
+            reorder_level=5,
+            selling_price=20,
+        )
+
+        response = self.client.get(reverse("reorder_suggestions"))
+
+        self.assertEqual(response.status_code, 200)
+        products = list(response.context["products"])
+        self.assertEqual([product.pk for product in products], [low_product.pk])
+        self.assertEqual(products[0].suggested_order_quantity, 3)
+
+    def test_zero_level_products_use_default_reorder_threshold(self):
+        default_threshold_product = Product.objects.create(
+            sku="REORDER-DEFAULT",
+            name="No configured reorder point",
+            quantity=2,
+            selling_price=20,
+        )
+
+        response = self.client.get(reverse("reorder_suggestions"))
+
+        self.assertEqual(response.status_code, 200)
+        product = response.context["products"][0]
+        self.assertEqual(product.pk, default_threshold_product.pk)
+        self.assertEqual(product.reorder_target, Product.LOW_STOCK_THRESHOLD)
+        self.assertEqual(product.suggested_order_quantity, 3)
 
 
 class ChassisLookupTests(TestCase):

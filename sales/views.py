@@ -8,6 +8,7 @@ from expenses.models import Expense
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.decorators import permission_required
 from django.contrib import messages
+from django.core.paginator import Paginator
 
 from inventory.models import Product, CarMake, CarModel
 from inventory.fitment import verify_product_fitment
@@ -463,9 +464,23 @@ def scan_barcode_api(request):
 
 @login_required
 def customer_list(request):
-    from .models import Customer
-    customers = Customer.objects.all().order_by('name')
-    return render(request, "sales/customer_list.html", {"customers": customers})
+    search = request.GET.get("q", "").strip()
+    customers = Customer.objects.all()
+    if search:
+        customers = customers.filter(
+            Q(name__icontains=search)
+            | Q(company_name__icontains=search)
+            | Q(tin_number__icontains=search)
+            | Q(vat_number__icontains=search)
+            | Q(phone__icontains=search)
+            | Q(email__icontains=search)
+        )
+    page = Paginator(customers.order_by("name", "id"), 25).get_page(request.GET.get("page"))
+    return render(request, "sales/customer_list.html", {
+        "customers": page,
+        "page": page,
+        "search": search,
+    })
 
 
 @login_required

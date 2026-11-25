@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+
+{% block title %}Supplier Payables - {{ app_name }}{% endblock %}
+{% block page_title %}Supplier Payables{% endblock %}
+
+{% block content %}
+<div style="display: flex; justify-content: flex-end; gap: 0.75rem; margin-bottom: 1.5rem;">
+    <a href="{% url 'reports_dashboard' %}" class="btn btn-secondary">Back to Reports</a>
+</div>
+
+<div class="card" style="margin-bottom: 1.5rem;">
+    <h2 style="margin-top: 0;">Record supplier payment</h2>
+    <p class="text-muted">Record payments made to suppliers. You can optionally link a purchase invoice.</p>
+    <form method="post">
+        {% csrf_token %}
+        {{ form.as_p }}
+        <button type="submit" class="btn">Save Payment</button>
+    </form>
+</div>
+
+<div class="card" style="padding: 0; overflow-x: auto; margin-bottom: 1.5rem;">
+    <div style="padding: 1.25rem 1.5rem; border-bottom: 1px solid hsl(var(--border));">
+        <h2 style="margin: 0;">Supplier balances</h2>
+        <p class="text-muted" style="margin-bottom: 0;">Recorded purchases minus recorded supplier payments. Opening payables are tracked globally and are not allocated to individual suppliers.</p>
+    </div>
+    <table class="sortable-table">
+        <thead>
+            <tr><th>Supplier</th><th>Recorded Purchases</th><th>Payments</th><th>Balance</th></tr>
+        </thead>
+        <tbody>
+            {% for row in supplier_balances %}
+            <tr>
+                <td>{{ row.supplier.name }}</td>
+                <td>{{ row.purchases|floatformat:2 }}</td>
+                <td>{{ row.payments|floatformat:2 }}</td>
+                <td><strong>{{ row.balance|floatformat:2 }}</strong></td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="4" style="text-align: center; padding: 2rem;">No suppliers have been added yet.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<div class="card" style="padding: 0; overflow-x: auto;">
+    <div style="padding: 1.25rem 1.5rem; border-bottom: 1px solid hsl(var(--border));">
+        <h2 style="margin: 0;">Recent supplier payments</h2>
+    </div>
+    <table class="sortable-table">
+        <thead>
+            <tr><th>Date</th><th>Supplier</th><th>Purchase</th><th>Amount</th><th>Method</th><th>Reference</th><th>Recorded by</th></tr>
+        </thead>
+        <tbody>
+            {% for payment in payments %}
+            <tr>
+                <td>{{ payment.payment_date|date:"Y-m-d" }}</td>
+                <td>{{ payment.supplier.name }}</td>
+                <td>{% if payment.purchase %}{{ payment.purchase.invoice_number|default:payment.purchase }}{% else %}—{% endif %}</td>
+                <td>{{ payment.amount|floatformat:2 }}</td>
+                <td>{{ payment.get_payment_method_display }}</td>
+                <td>{{ payment.reference|default:"—" }}</td>
+                <td>{{ payment.created_by|default:"—" }}</td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="7" style="text-align: center; padding: 2rem;">No supplier payments recorded yet.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

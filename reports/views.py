@@ -2,6 +2,7 @@ from decimal import Decimal, InvalidOperation
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
+from django.db.models import OuterRef, Subquery, Sum
 from django.http import HttpResponse
 from django.utils import timezone
 from openpyxl import Workbook
@@ -12,6 +13,8 @@ import io
 
 from .models import BusinessProfile, OpeningBalance, CustomerPayment, SupplierPayment, StockCountAdjustment, VATWithholdingReceipt
 from .services import get_date_range, get_financial_overview, get_income_statement_data
+from .forms import SupplierPaymentForm
+from inventory.models import Purchase, Supplier
 
 
 @login_required
@@ -50,6 +53,58 @@ def reports_dashboard(request):
         "preset": preset,
         "prev_start": prev_start,
         "prev_end": prev_end,
+    })
+
+
+@login_required
+def supplier_payables_view(request):
+    if request.method == "POST":
+        form = SupplierPaymentForm(request.POST)
+        if form.is_valid():
+            payment = form.save(commit=False)
+            payment.created_by = request.user
+            payment.save()
+            messages.success(request, "Supplier payment recorded.")
+            return redirect("supplier_payables")
+    else:
+        form = SupplierPaymentForm()
+
+    purchase_totals = (
+        Purchase.objects.filter(supplier_id=OuterRef("pk"))
+        .order_by()
+        .values("supplier_id")
+        .annotate(total=Sum("total_amount"))
+        .values("total")[:1]
+    )
+    payment_totals = (
+        SupplierPayment.objects.filter(supplier_id=OuterRef("pk"))
+        .order_by()
+        .values("supplier_id")
+        .annotate(total=Sum("amount"))
+        .values("total")[:1]
+    )
+    suppliers = Supplier.objects.annotate(
+        purchase_total=Subquery(purchase_totals),
+        payment_total=Subquery(payment_totals),
+    ).order_by("name")
+    supplier_balances = []
+    for supplier in suppliers:
+        purchases = Decimal(str(supplier.purchase_total or 0))
+        payments = Decimal(str(supplier.payment_total or 0))
+        supplier_balances.append({
+            "supplier": supplier,
+            "purchases": purchases,
+            "payments": payments,
+            "balance": purchases - payments,
+        })
+
+    payments = SupplierPayment.objects.select_related(
+        "supplier", "purchase", "created_by"
+    ).order_by("-payment_date", "-id")[:100]
+    return render(request, "reports/supplier_payables.html", {
+        "form": form,
+        "supplier_balances": supplier_balances,
+        "payments": payments,
     })
 
 

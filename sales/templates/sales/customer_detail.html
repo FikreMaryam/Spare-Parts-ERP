@@ -111,6 +111,7 @@
                     <div>Fleet Size: <strong>{{ vehicles.count }} vehicles</strong></div>
                     <div>Loyalty Points: <strong>{{ customer.loyalty_points }} pts</strong></div>
                     <div>Total Orders: <strong>{{ sales.count }} sales</strong></div>
+                    <div>Credit Limit: <strong>{{ customer.credit_limit|floatformat:2 }} ETB</strong></div>
                 </div>
             </div>
         </div>

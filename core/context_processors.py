@@ -1,5 +1,6 @@
 from django.conf import settings
 from django.utils.translation import get_language
+from reports.models import BusinessProfile
 
 
 AMHARIC_LABELS = {
@@ -87,7 +88,11 @@ AMHARIC_LABELS = {
 def app_context(request):
     language = (get_language() or settings.LANGUAGE_CODE).split("-")[0]
     labels = AMHARIC_LABELS if language == "am" else {}
+    business_profile = BusinessProfile.objects.order_by("pk").only("trade_name", "name").first()
+    app_name = settings.APP_NAME
+    if business_profile:
+        app_name = business_profile.trade_name or business_profile.name or settings.APP_NAME
     return {
-        "app_name": settings.APP_NAME,
+        "app_name": app_name,
         "ui": labels,
     }

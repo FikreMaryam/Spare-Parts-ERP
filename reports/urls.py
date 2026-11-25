@@ -13,6 +13,7 @@ urlpatterns = [
 
     # Accounting Documents & Receipts
     path("vat-withholding-receipts/", views.vat_withholding_receipts_view, name="vat_withholding_receipts"),
+    path("supplier-payables/", views.supplier_payables_view, name="supplier_payables"),
 
     # Settings & Baselines
     path("settings/", views.business_profile_view, name="reports_settings"),
